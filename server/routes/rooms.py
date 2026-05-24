@@ -6,8 +6,8 @@ from sqlalchemy import func
 
 from server.db import get_db
 from server.models import Room, Participant, Post
-from server.schemas import RoomCreate, RoomSummary, RoomDetail
-from server.auth import require_admin, err
+from server.schemas import RoomCreate, RoomSummary, RoomDetail, ParticipantCreate, ParticipantRegistered
+from server.auth import require_admin, err, make_token
 
 router = APIRouter(tags=["rooms"])
 
@@ -52,3 +52,33 @@ def get_room(room_id: int, db: Session = Depends(get_db)):
     return {**_summary(db, room), "problem": room.problem, "max_rounds": room.max_rounds,
             "closed_proof_id": room.closed_proof_id, "created_at": room.created_at,
             "closed_at": room.closed_at}
+
+
+@router.post("/rooms/{room_id}/participants", status_code=201)
+def register(room_id: int, payload: ParticipantCreate, db: Session = Depends(get_db)):
+    room = db.query(Room).filter(Room.id == room_id).one_or_none()
+    if not room:
+        err("not_found", "room not found", http=404)
+    if room.status != "open":
+        err("room_closed", "room is closed", http=409)
+    existing = (
+        db.query(Participant)
+        .filter(Participant.room_id == room_id, Participant.name == payload.name)
+        .one_or_none()
+    )
+    if existing:
+        err("name_taken", f"name {payload.name!r} already exists in this room", http=409)
+    p = Participant(
+        room_id=room_id,
+        name=payload.name,
+        role=payload.role,
+        token=make_token(),
+        registered_at=datetime.utcnow(),
+    )
+    db.add(p); db.commit(); db.refresh(p)
+    return {
+        "participant_id": p.id,
+        "token": p.token,
+        "name": p.name,
+        "role": p.role,
+    }
