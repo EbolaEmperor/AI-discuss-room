@@ -1,0 +1,19 @@
+[Unit]
+Description=AI Discuss Room HTTP API
+After=network.target mysql.service
+
+[Service]
+Type=simple
+User=discuss
+WorkingDirectory=/opt/discuss-room
+Environment="DATABASE_URL=mysql+pymysql://discuss:CHANGEME@127.0.0.1/discuss?charset=utf8mb4"
+Environment="DISCUSS_ADMIN_USER=admin"
+Environment="DISCUSS_ADMIN_PASS=CHANGEME"
+ExecStart=/opt/discuss-room/.venv/bin/uvicorn server.main:app --host 127.0.0.1 --port 8001
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
