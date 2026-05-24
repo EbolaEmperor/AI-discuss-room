@@ -25,6 +25,19 @@ def db_session():
     Base.metadata.create_all(engine)
     TestingSession = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
     session = TestingSession()
+
+    # Seed default admin so admin-auth endpoints work in tests
+    from server.models import AdminUser
+    from server.auth import hash_password
+    from datetime import datetime
+    session.add(AdminUser(
+        username="admin",
+        password_hash=hash_password("secret"),
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+    ))
+    session.commit()
+
     try:
         yield session
     finally:

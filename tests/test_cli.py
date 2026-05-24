@@ -27,6 +27,20 @@ def running_server(tmp_path_factory):
     db_module.SessionLocal = sessionmaker(bind=db_module.engine, autoflush=False, autocommit=False, future=True)
     Base.metadata.create_all(db_module.engine)
 
+    # Seed default admin
+    from server.models import AdminUser
+    from server.auth import hash_password
+    from datetime import datetime
+    session = db_module.SessionLocal()
+    session.add(AdminUser(
+        username="admin",
+        password_hash=hash_password("secret"),
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+    ))
+    session.commit()
+    session.close()
+
     # Pick a free port
     sock = socket.socket(); sock.bind(("127.0.0.1", 0))
     port = sock.getsockname()[1]; sock.close()
