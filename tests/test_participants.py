@@ -52,3 +52,40 @@ def test_register_room_closed(client, db_session):
     r = client.post(f"/rooms/{room['id']}/participants", json={"name": "a", "role": "producer"})
     assert r.status_code == 409
     assert r.json()["error"]["code"] == "room_closed"
+
+
+def _register(client, room_id, name, role="producer"):
+    r = client.post(f"/rooms/{room_id}/participants", json={"name": name, "role": role})
+    return r.json()
+
+
+def auth(token):
+    return {"Authorization": f"Bearer {token}"}
+
+
+def test_problem_requires_token(client):
+    room = make_room(client)
+    r = client.get(f"/rooms/{room['id']}/problem")
+    assert r.status_code == 401
+
+
+def test_problem_returns_text(client):
+    room = make_room(client, problem="Prove anything.")
+    p = _register(client, room["id"], "a")
+    r = client.get(f"/rooms/{room['id']}/problem", headers=auth(p["token"]))
+    assert r.status_code == 200
+    assert r.text.strip('"') == "Prove anything."  # JSON-encoded string
+
+
+def test_list_participants_redacted(client):
+    room = make_room(client)
+    p_a = _register(client, room["id"], "a")
+    _register(client, room["id"], "b", role="reviewer")
+    r = client.get(f"/rooms/{room['id']}/participants", headers=auth(p_a["token"]))
+    assert r.status_code == 200
+    body = r.json()
+    names = {x["name"] for x in body}
+    assert names == {"a", "b"}
+    for x in body:
+        assert "has_published_first" in x
+        assert x["has_published_first"] is False

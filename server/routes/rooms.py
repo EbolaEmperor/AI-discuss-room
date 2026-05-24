@@ -7,7 +7,7 @@ from sqlalchemy import func
 from server.db import get_db
 from server.models import Room, Participant, Post
 from server.schemas import RoomCreate, RoomSummary, RoomDetail, ParticipantCreate, ParticipantRegistered
-from server.auth import require_admin, err, make_token
+from server.auth import require_admin, require_participant, err, make_token
 
 router = APIRouter(tags=["rooms"])
 
@@ -82,3 +82,24 @@ def register(room_id: int, payload: ParticipantCreate, db: Session = Depends(get
         "name": p.name,
         "role": p.role,
     }
+
+
+@router.get("/rooms/{room_id}/problem")
+def get_problem(room_id: int, db: Session = Depends(get_db), me: Participant = Depends(require_participant)):
+    room = db.query(Room).filter(Room.id == room_id).one_or_none()
+    if not room or me.room_id != room_id:
+        err("not_found", "room not found", http=404)
+    return room.problem
+
+
+@router.get("/rooms/{room_id}/participants")
+def list_participants(
+    room_id: int, db: Session = Depends(get_db), me: Participant = Depends(require_participant)
+):
+    if me.room_id != room_id:
+        err("not_found", "room not found", http=404)
+    parts = db.query(Participant).filter(Participant.room_id == room_id).all()
+    return [
+        {"name": p.name, "role": p.role, "has_published_first": p.first_post_at is not None}
+        for p in parts
+    ]
