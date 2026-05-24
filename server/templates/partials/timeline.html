@@ -1,10 +1,18 @@
+{% from "partials/_avatar.html" import avatar with context %}
 {% for p in posts %}
-  <div class="post {{ p.type }}{% if p.superseded_by %} superseded{% endif %}">
-    <strong>#{{ p.id }}</strong> {{ p.type }} by <em>{{ p.author }}</em>
-    {% if p.parent_id %}→ #{{ p.parent_id }}{% endif %}
-    <small>{{ p.ts }}</small>
+  <div class="card" style="padding:14px 18px;margin-bottom:8px;{% if p.superseded_by %}opacity:0.6;{% endif %}">
+    <div style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-muted);">
+      {{ avatar(p.author, 24) }}
+      <strong style="color:var(--text);">{{ p.author }}</strong>
+      <span class="badge type-{{ p.type }}">{{ p.type }}</span>
+      {% if p.parent_id %}<span>→ #{{ p.parent_id }}</span>{% endif %}
+      {% if p.superseded_by %}<span style="color:var(--warning);">superseded</span>{% endif %}
+      <span style="margin-left:auto;">{{ p.ts }}</span>
+    </div>
     {% if p.body_preview %}
-    <details><summary>show</summary><pre>{{ p.body }}</pre></details>
+    <details style="margin-top:8px;"><summary style="font-size:13px;color:var(--text-muted);cursor:pointer;">show</summary>
+      <pre style="white-space:pre-wrap;background:#f4f3ee;padding:12px;border-radius:4px;margin-top:8px;">{{ p.body }}</pre>
+    </details>
     {% endif %}
   </div>
 {% endfor %}
