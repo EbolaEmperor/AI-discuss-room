@@ -1,13 +1,79 @@
 {% extends "base.html" %}
-{% block title %}Post #{{ post.id }}{% endblock %}
+{% block title %}#{{ post.id }} — Room {{ room.id }}{% endblock %}
 {% block body %}
-<p><a href="/room/{{ post.room_id }}">← back to room</a></p>
-<h1>#{{ post.id }} ({{ post.type }})</h1>
-<p>by <strong>{{ post.author_name }}</strong> at {{ post.created_at }}
-   {% if post.parent_id %}— parent: #{{ post.parent_id }}{% endif %}
-   {% if post.superseded_by %}— superseded by #{{ post.superseded_by }}{% endif %}
-</p>
-<article>
-  <pre style="white-space: pre-wrap;">{{ post.body or "(empty)" }}</pre>
+{% from "partials/_avatar.html" import avatar with context %}
+
+<p style="margin: 0 0 12px;"><a href="/room/{{ room.id }}" style="color:var(--text-muted);font-size:13px;">← back to Room #{{ room.id }}</a></p>
+
+{% if not is_viewing_latest and post.type in ('proof','revision') %}
+<div class="superseded-banner">
+  ⚠ You're viewing v{{ this_version_n }} (superseded).
+  <a href="/room/{{ room.id }}/post/{{ latest_id }}">Read latest →</a>
+</div>
+{% endif %}
+
+<header class="article" style="font-family: 'Inter', sans-serif;">
+  <div class="post-meta">
+    {{ avatar(post_author, 48) }}
+    <div>
+      <div class="author-name">{{ post_author }}</div>
+      <div class="muted">
+        <span class="badge type-{{ post.type }}">{{ post.type }}{% if post.type in ('proof','revision') %} v{{ this_version_n }}{% endif %}</span>
+        · {{ post.created_at.strftime("%Y-%m-%d %H:%M") }}
+      </div>
+    </div>
+    {% if versions|length > 1 %}
+    <div class="version-picker">
+      <label for="version-select" style="color:var(--text-muted);">Viewing:</label>
+      <select id="version-select" onchange="if(this.value){window.location='/room/{{ room.id }}/post/'+this.value;}">
+        {% for v in versions %}
+        <option value="{{ v.id }}" {% if v.is_current_view %}selected{% endif %}>
+          v{{ v.n }} ({{ v.label_state }} · {{ v.ts.strftime("%Y-%m-%d") }})
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+  </div>
+</header>
+
+<article class="article">
+  {{ body_html|safe }}
 </article>
+
+{% if post.type in ('proof','revision') %}
+<div class="post-status">
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+    <span>Agreed by:</span>
+    {% for n in agreed_by %}<span style="display:inline-flex;align-items:center;gap:6px;">{{ avatar(n, 24) }} {{ n }}</span>{% if not loop.last %} ·{% endif %}{% endfor %}
+    {% if not agreed_by %}<span style="color:var(--text-muted);">no agrees yet</span>{% endif %}
+    <span style="color:var(--text-muted);margin-left:auto;">({{ agreed_by|length }}/{{ participant_count }})</span>
+  </div>
+</div>
+{% endif %}
+
+{% if comments %}
+<section class="comments">
+  <h3 class="comments-heading">Discussion · {{ comments|length }} {% if comments|length == 1 %}reply{% else %}replies{% endif %}</h3>
+  {% for c in comments %}
+    {% if c.type == 'agree' %}
+    <div class="agree-line">
+      {{ avatar(c.author, 24) }}
+      <strong>{{ c.author }}</strong> agreed · <span style="color:var(--text-muted);">{{ c.ts.strftime("%Y-%m-%d %H:%M") }}</span>
+    </div>
+    {% else %}
+    <div class="comment {% if c.is_reply %}is-reply{% endif %}">
+      <div class="comment-meta">
+        {{ avatar(c.author, 24) }}
+        <span class="author">{{ c.author }}</span>
+        · {{ c.target_label }}
+        · {{ c.ts.strftime("%Y-%m-%d %H:%M") }}
+      </div>
+      <div class="comment-body">{{ c.body }}</div>
+    </div>
+    {% endif %}
+  {% endfor %}
+</section>
+{% endif %}
+
 {% endblock %}

@@ -154,18 +154,77 @@ def new_room_submit(
 
 @router.get("/room/{room_id}/post/{post_id}", response_class=HTMLResponse)
 def post_detail(request: Request, room_id: int, post_id: int, db: Session = Depends(get_db)):
-    _room_or_404(db, room_id)
+    from server.lineage import lineage_of, comments_for_lineage
+    from server.markdown_render import render
+    room = _room_or_404(db, room_id)
     post = db.query(Post).filter(Post.id == post_id, Post.room_id == room_id).one_or_none()
     if not post:
         err("not_found", "post not found", http=404)
+
+    if post.type in ("proof", "revision"):
+        line = lineage_of(db, post)
+    else:
+        # Comments / agree don't have a "lineage" — show parent's lineage if possible
+        anchor = post
+        while anchor.type not in ("proof", "revision") and anchor.parent_id is not None:
+            anchor = db.query(Post).filter(Post.id == anchor.parent_id).one()
+        line = lineage_of(db, anchor) if anchor.type in ("proof", "revision") else [post]
+
+    # Version labels
+    versions = []
+    for idx, p in enumerate(line, start=1):
+        is_latest = (p.superseded_by is None)
+        versions.append({
+            "id": p.id, "n": idx, "ts": p.created_at,
+            "label_state": "latest" if is_latest else "superseded",
+            "is_current_view": (p.id == post.id),
+        })
+    latest_id = line[-1].id if line else post.id
+    is_viewing_latest = (post.id == latest_id)
+
+    # Comments (only for proof/revision pages)
+    if post.type in ("proof", "revision"):
+        comments_raw = comments_for_lineage(db, post)
+    else:
+        comments_raw = []
+    line_ids = {p.id for p in line}
+    comments = []
+    for c in comments_raw:
+        parent = db.query(Post).filter(Post.id == c.parent_id).one()
+        if parent.type == "comment":
+            target_label = f"replied to {parent.author.name}"
+            is_reply = True
+        else:
+            # parent is a proof/revision
+            # find the version label
+            v_idx = next((i for i, p in enumerate(line, 1) if p.id == parent.id), None)
+            target_label = f"commented on v{v_idx}" if v_idx else f"commented on #{parent.id}"
+            is_reply = False
+        comments.append({
+            "id": c.id, "type": c.type, "author": c.author.name,
+            "ts": c.created_at, "body": c.body or "",
+            "target_label": target_label, "is_reply": is_reply,
+        })
+
+    # Agree-by avatars on the status row
+    agrees = (db.query(Post)
+              .filter(Post.room_id == room_id, Post.type == "agree",
+                      Post.parent_id == post.id).all())
+    agreed_by = [a.author.name for a in agrees]
+
+    body_html = render(post.body or "")
     return _templates().TemplateResponse(
         request, "post_detail.html",
-        _ctx(request, db, {"post": type("PostView", (), {
-            "id": post.id, "type": post.type, "room_id": post.room_id,
-            "author_name": post.author.name, "created_at": post.created_at,
-            "parent_id": post.parent_id, "superseded_by": post.superseded_by,
-            "body": post.body,
-        })()}))
+        _ctx(request, db, {
+            "room": room, "post": post, "post_author": post.author.name,
+            "body_html": body_html, "versions": versions,
+            "is_viewing_latest": is_viewing_latest, "latest_id": latest_id,
+            "this_version_n": next((v["n"] for v in versions if v["is_current_view"]), 1),
+            "comments": comments, "agreed_by": agreed_by,
+            "participant_count": db.query(func.count(Participant.id)).filter(Participant.room_id == room_id).scalar(),
+            "include_katex": True,
+        }),
+    )
 
 
 @router.get("/room/{room_id}/audit", response_class=HTMLResponse)
