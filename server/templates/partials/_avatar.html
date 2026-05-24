@@ -1,0 +1,3 @@
+{% macro avatar(name, size=32) -%}
+<img class="avatar avatar-{{ size }}" src="{{ avatar_url(name) }}" alt="{{ name }}" width="{{ size }}" height="{{ size }}" loading="lazy">
+{%- endmacro %}

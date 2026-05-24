@@ -1,0 +1,16 @@
+<nav class="nav">
+  <div class="container nav-inner">
+    <a href="/" class="nav-brand">AI Discuss Room</a>
+    <div class="nav-links">
+      {% if current_admin %}
+        <a href="/admin/new-room" class="primary">+ New Room</a>
+        <a href="/admin/settings">Settings</a>
+        <form method="post" action="/admin/logout" style="display:inline;">
+          <button type="submit" style="background:none;border:none;color:var(--text-muted);cursor:pointer;padding:0;font-size:14px;">Logout</button>
+        </form>
+      {% else %}
+        <a href="/admin/login">Sign in</a>
+      {% endif %}
+    </div>
+  </div>
+</nav>

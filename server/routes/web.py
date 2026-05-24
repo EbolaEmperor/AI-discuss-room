@@ -7,7 +7,8 @@ from sqlalchemy import func
 
 from server.db import get_db
 from server.models import Room, Participant, Post
-from server.auth import err
+from server.auth import err, current_admin_or_none
+from server.avatars import avatar_url
 
 router = APIRouter(tags=["web"])
 
@@ -15,6 +16,16 @@ router = APIRouter(tags=["web"])
 def _templates():
     from server.main import templates
     return templates
+
+
+def _ctx(request: Request, db: Session, extra: dict | None = None) -> dict:
+    base = {
+        "current_admin": current_admin_or_none(request, db),
+        "avatar_url": avatar_url,
+    }
+    if extra:
+        base.update(extra)
+    return base
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -26,7 +37,7 @@ def index(request: Request, db: Session = Depends(get_db)):
         postc = db.query(func.count(Post.id)).filter(Post.room_id == r.id).scalar()
         out.append({"id": r.id, "title": r.title, "status": r.status,
                     "participant_count": pc, "post_count": postc})
-    return _templates().TemplateResponse(request, "index.html", {"rooms": out})
+    return _templates().TemplateResponse(request, "index.html", _ctx(request, db, {"rooms": out}))
 
 
 def _room_or_404(db: Session, room_id: int) -> Room:
@@ -56,8 +67,8 @@ def room_view(request: Request, room_id: int, db: Session = Depends(get_db)):
              for p in participants]
     return _templates().TemplateResponse(
         request, "room.html",
-        {"room": room, "participants": parts, "current_proofs": current_proofs,
-         "problem_html": problem_html},
+        _ctx(request, db, {"room": room, "participants": parts, "current_proofs": current_proofs,
+         "problem_html": problem_html}),
     )
 
 
@@ -74,7 +85,7 @@ def timeline_partial(request: Request, room_id: int, db: Session = Depends(get_d
             "body": p.body or "",
             "body_preview": bool(p.body),
         })
-    return _templates().TemplateResponse(request, "partials/timeline.html", {"posts": items})
+    return _templates().TemplateResponse(request, "partials/timeline.html", _ctx(request, db, {"posts": items}))
 
 
 from fastapi import Form, status as http_status
@@ -84,8 +95,8 @@ from server.auth import require_admin
 
 
 @router.get("/admin/new-room", response_class=HTMLResponse)
-def new_room_form(request: Request, _: str = Depends(require_admin)):
-    return _templates().TemplateResponse(request, "admin_new_room.html", {})
+def new_room_form(request: Request, db: Session = Depends(get_db), _: str = Depends(require_admin)):
+    return _templates().TemplateResponse(request, "admin_new_room.html", _ctx(request, db))
 
 
 @router.post("/admin/new-room")
@@ -110,12 +121,12 @@ def post_detail(request: Request, room_id: int, post_id: int, db: Session = Depe
         err("not_found", "post not found", http=404)
     return _templates().TemplateResponse(
         request, "post_detail.html",
-        {"post": type("PostView", (), {
+        _ctx(request, db, {"post": type("PostView", (), {
             "id": post.id, "type": post.type, "room_id": post.room_id,
             "author_name": post.author.name, "created_at": post.created_at,
             "parent_id": post.parent_id, "superseded_by": post.superseded_by,
             "body": post.body,
-        })()})
+        })()}))
 
 
 @router.get("/room/{room_id}/audit", response_class=HTMLResponse)
@@ -133,7 +144,7 @@ def room_audit(request: Request, room_id: int, db: Session = Depends(get_db)):
         events.append({"ts": r.read_at.isoformat(), "kind": "read", "by": r.participant.name,
                        "detail": f"read post #{r.post_id}"})
     events.sort(key=lambda e: e["ts"])
-    return _templates().TemplateResponse(request, "audit.html", {"room": room, "events": events})
+    return _templates().TemplateResponse(request, "audit.html", _ctx(request, db, {"room": room, "events": events}))
 
 
 from server.avatars import fallback_svg
