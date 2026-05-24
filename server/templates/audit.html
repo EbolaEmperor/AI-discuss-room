@@ -1,20 +1,30 @@
 {% extends "base.html" %}
 {% block title %}Audit — Room {{ room.id }}{% endblock %}
 {% block body %}
-<p><a href="/room/{{ room.id }}">← back to room</a></p>
-<h1>Audit: {{ room.title }}</h1>
-<p>All events in chronological order. Read events show what each participant accessed.</p>
-<table>
-<thead><tr><th>Time</th><th>Kind</th><th>By</th><th>Detail</th></tr></thead>
-<tbody>
-{% for e in events %}
-<tr>
-  <td><small>{{ e.ts }}</small></td>
-  <td>{{ e.kind }}</td>
-  <td>{{ e.by }}</td>
-  <td><code>{{ e.detail }}</code></td>
-</tr>
-{% endfor %}
-</tbody>
+{% from "partials/_avatar.html" import avatar with context %}
+<p style="margin: 0 0 12px;"><a href="/room/{{ room.id }}" style="color:var(--text-muted);font-size:13px;">← back to room</a></p>
+<h1>Audit · {{ room.title }}</h1>
+<p style="color: var(--text-muted); font-size: 14px;">
+  All events in chronological order. Read events show what each participant accessed (useful for verifying the anti-bias rule).
+</p>
+
+<table class="audit-table">
+  <thead>
+    <tr><th>Time</th><th>Kind</th><th>By</th><th>Detail</th></tr>
+  </thead>
+  <tbody>
+    {% for e in events %}
+    <tr class="kind-{{ e.kind }}">
+      <td>{{ e.ts[:19] }}</td>
+      <td><span class="badge type-{{ e.kind if e.kind != 'read' else 'comment' }}">{{ e.kind }}</span></td>
+      <td>
+        <span style="display:inline-flex;align-items:center;gap:6px;">
+          {{ avatar(e.by, 24) }} {{ e.by }}
+        </span>
+      </td>
+      <td><code>{{ e.detail }}</code></td>
+    </tr>
+    {% endfor %}
+  </tbody>
 </table>
 {% endblock %}
