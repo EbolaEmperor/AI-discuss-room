@@ -1,5 +1,6 @@
 # server/routes/posts.py
 from datetime import datetime
+from typing import Optional
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
@@ -105,3 +106,46 @@ def create_post(
 
     # Consensus check after agree (added in Task 12). For now, just commit.
     return _post_meta(new)
+
+
+def _gate_anti_bias(me: Participant):
+    if me.role == "producer" and me.first_post_at is None:
+        err("must_publish_first", "publish your first proof before reading posts", http=403)
+
+
+@router.get("/rooms/{room_id}/posts")
+def list_posts(
+    room_id: int,
+    since: int = 0,
+    type: Optional[str] = None,
+    db: Session = Depends(get_db),
+    me: Participant = Depends(require_participant),
+):
+    if me.room_id != room_id:
+        err("not_found", "room not found", http=404)
+    _gate_anti_bias(me)
+    q = db.query(Post).filter(Post.room_id == room_id, Post.id > since)
+    if type:
+        q = q.filter(Post.type == type)
+    posts = q.order_by(Post.id.asc()).all()
+    return [_post_meta(p) for p in posts]
+
+
+@router.get("/rooms/{room_id}/posts/{post_id}")
+def read_post(
+    room_id: int,
+    post_id: int,
+    db: Session = Depends(get_db),
+    me: Participant = Depends(require_participant),
+):
+    if me.room_id != room_id:
+        err("not_found", "room not found", http=404)
+    _gate_anti_bias(me)
+    post = db.query(Post).filter(Post.id == post_id, Post.room_id == room_id).one_or_none()
+    if not post:
+        err("not_found", "post not found", http=404)
+    # Record read event
+    from server.models import Read
+    db.add(Read(participant_id=me.id, post_id=post_id, read_at=datetime.utcnow()))
+    db.commit()
+    return {**_post_meta(post), "body": post.body}
