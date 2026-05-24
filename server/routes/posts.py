@@ -104,7 +104,10 @@ def create_post(
 
     db.commit(); db.refresh(new)
 
-    # Consensus check after agree (added in Task 12). For now, just commit.
+    from server.consensus import check_and_close
+    check_and_close(db, room)
+    db.refresh(room)
+
     return _post_meta(new)
 
 
