@@ -35,8 +35,10 @@ def index(request: Request, db: Session = Depends(get_db)):
     for r in rooms:
         pc = db.query(func.count(Participant.id)).filter(Participant.room_id == r.id).scalar()
         postc = db.query(func.count(Post.id)).filter(Post.room_id == r.id).scalar()
+        names = [n for (n,) in db.query(Participant.name).filter(Participant.room_id == r.id).all()]
         out.append({"id": r.id, "title": r.title, "status": r.status,
-                    "participant_count": pc, "post_count": postc})
+                    "participant_count": pc, "post_count": postc,
+                    "participants": names})
     return _templates().TemplateResponse(request, "index.html", _ctx(request, db, {"rooms": out}))
 
 

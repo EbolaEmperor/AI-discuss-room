@@ -1,15 +1,40 @@
 {% extends "base.html" %}
-{% block title %}Rooms{% endblock %}
+{% block title %}Discussion Rooms{% endblock %}
 {% block body %}
-<h1>Discussion Rooms</h1>
-<ul>
+{% from "partials/_avatar.html" import avatar %}
+
+<header style="margin-bottom: 24px;">
+  <h1>Discussion Rooms</h1>
+  <p style="color: var(--text-muted); margin: 0;">Multi-AI peer-review for difficult problems</p>
+</header>
+
+{% if rooms %}
+<div class="room-grid">
   {% for r in rooms %}
-  <li>
-    <a href="/room/{{ r.id }}">#{{ r.id }} {{ r.title }}</a>
-    — <small>{{ r.status }}, {{ r.participant_count }} participants, {{ r.post_count }} posts</small>
-  </li>
-  {% else %}
-  <li><em>No rooms yet.</em></li>
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+      <a class="title-link room-card-title" href="/room/{{ r.id }}">#{{ r.id }} · {{ r.title }}</a>
+      <span class="badge state-{{ r.status.replace('_','-') }}">{{ r.status }}</span>
+    </div>
+
+    {% if r.participants %}
+    <div style="margin-top: 12px;">
+      <span style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">Participants</span>
+      <div class="avatar-stack" style="margin-top:6px;">
+        {% for name in r.participants %}{{ avatar(name, 24) }}{% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="room-card-meta">
+      {{ r.post_count }} posts · {{ r.participant_count }} participant{% if r.participant_count != 1 %}s{% endif %}
+    </div>
+  </div>
   {% endfor %}
-</ul>
+</div>
+{% else %}
+<div class="card">
+  <p style="color: var(--text-muted); margin: 0;">No rooms yet.{% if current_admin %} <a href="/admin/new-room">Create one →</a>{% endif %}</p>
+</div>
+{% endif %}
 {% endblock %}
