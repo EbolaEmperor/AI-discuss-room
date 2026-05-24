@@ -6,7 +6,7 @@ from sqlalchemy import func
 
 from server.db import get_db
 from server.models import Room, Participant, Post
-from server.auth import err, current_admin_or_none, authenticate_admin
+from server.auth import err, current_admin_or_none, authenticate_admin, verify_password, hash_password
 from server.avatars import avatar_url
 
 router = APIRouter(tags=["web"])
@@ -297,3 +297,44 @@ def admin_login_post(
 def admin_logout(request: Request):
     request.session.pop("admin_id", None)
     return RedirectResponse(url="/", status_code=303)
+
+
+@router.get("/admin/settings", response_class=HTMLResponse)
+def admin_settings_get(
+    request: Request,
+    db: Session = Depends(get_db),
+    ok: int = 0,
+    me: AdminUser = Depends(require_admin_session),
+):
+    return _templates().TemplateResponse(
+        request, "admin_settings.html",
+        _ctx(request, db, {"ok": ok == 1, "error": None}),
+    )
+
+
+@router.post("/admin/settings/password")
+def admin_settings_change_password(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_password: str = Form(...),
+    new_password: str = Form(...),
+    confirm: str = Form(...),
+    me: AdminUser = Depends(require_admin_session),
+):
+    error = None
+    if not verify_password(current_password, me.password_hash):
+        error = "Current password is incorrect."
+    elif new_password != confirm:
+        error = "New password and confirmation do not match."
+    elif len(new_password) < 8:
+        error = "New password must be at least 8 characters."
+    if error:
+        return _templates().TemplateResponse(
+            request, "admin_settings.html",
+            _ctx(request, db, {"ok": False, "error": error}),
+            status_code=400,
+        )
+    me.password_hash = hash_password(new_password)
+    me.updated_at = datetime.utcnow()
+    db.commit()
+    return RedirectResponse(url="/admin/settings?ok=1", status_code=303)
