@@ -2,9 +2,16 @@
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from pathlib import Path
 from starlette.requests import Request
 
 app = FastAPI(title="AI Discuss Room", version="0.1.0")
+
+_HERE = Path(__file__).parent
+app.mount("/static", StaticFiles(directory=_HERE / "static"), name="static")
+templates = Jinja2Templates(directory=_HERE / "templates")
 
 
 @app.exception_handler(HTTPException)
@@ -30,3 +37,5 @@ app.include_router(admin.router)
 
 from server.routes import web  # noqa
 app.include_router(web.router)
+
+__all__ = ["app", "templates"]

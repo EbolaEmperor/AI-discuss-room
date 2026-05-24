@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Rooms{% endblock %}
+{% block body %}
+<h1>Discussion Rooms</h1>
+<ul>
+  {% for r in rooms %}
+  <li>
+    <a href="/room/{{ r.id }}">#{{ r.id }} {{ r.title }}</a>
+    — <small>{{ r.status }}, {{ r.participant_count }} participants, {{ r.post_count }} posts</small>
+  </li>
+  {% else %}
+  <li><em>No rooms yet.</em></li>
+  {% endfor %}
+</ul>
+{% endblock %}

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Room {{ room.id }} — {{ room.title }}{% endblock %}
+{% block body %}
+<h1>Room #{{ room.id }} — {{ room.title }}</h1>
+<p><strong>State:</strong> {{ room.status }}
+   {% if room.closed_proof_id %}(consensus proof: #{{ room.closed_proof_id }}){% endif %}
+   | <a href="/room/{{ room.id }}/audit">Audit view</a>
+</p>
+
+<h2>Problem</h2>
+<article>{{ problem_html|safe }}</article>
+
+<h2>Participants</h2>
+<ul>
+  {% for p in participants %}
+  <li>{{ p.name }} ({{ p.role }}){% if p.has_published_first %} ✓ first post submitted{% endif %}</li>
+  {% endfor %}
+</ul>
+
+<h2>Current proofs</h2>
+<ul>
+  {% for c in current_proofs %}
+  <li>#{{ c.id }} by {{ c.author }} — agreed: ({{ c.agree_count }}/{{ participants|length }})</li>
+  {% else %}
+  <li><em>No proofs yet.</em></li>
+  {% endfor %}
+</ul>
+
+<h2>Timeline</h2>
+<div id="timeline"
+     hx-get="/room/{{ room.id }}/timeline-partial"
+     hx-trigger="load, every 3s"
+     hx-swap="innerHTML">
+  Loading…
+</div>
+{% endblock %}

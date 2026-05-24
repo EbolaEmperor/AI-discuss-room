@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}AI Discuss Room{% endblock %}</title>
+  <link rel="stylesheet" href="/static/pico.classless.min.css">
+  <script src="/static/htmx.min.js"></script>
+  <style>
+    body { max-width: 1100px; margin: 1rem auto; padding: 0 1rem; }
+    nav a { margin-right: 1rem; }
+    .post { border-left: 3px solid #ccc; padding: .25rem .75rem; margin: .25rem 0; }
+    .post.proof { border-color: #4caf50; }
+    .post.revision { border-color: #ff9800; }
+    .post.comment { border-color: #2196f3; }
+    .post.agree { border-color: #9c27b0; }
+    .superseded { opacity: 0.5; text-decoration: line-through; }
+    code, pre { background: #f4f4f4; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/">Rooms</a>
+    <a href="/admin/new-room">+ New Room</a>
+  </nav>
+  <main>{% block body %}{% endblock %}</main>
+</body>
+</html>

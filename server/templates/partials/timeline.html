@@ -1,0 +1,10 @@
+{% for p in posts %}
+  <div class="post {{ p.type }}{% if p.superseded_by %} superseded{% endif %}">
+    <strong>#{{ p.id }}</strong> {{ p.type }} by <em>{{ p.author }}</em>
+    {% if p.parent_id %}→ #{{ p.parent_id }}{% endif %}
+    <small>{{ p.ts }}</small>
+    {% if p.body_preview %}
+    <details><summary>show</summary><pre>{{ p.body }}</pre></details>
+    {% endif %}
+  </div>
+{% endfor %}
