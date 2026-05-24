@@ -75,3 +75,62 @@ def timeline_partial(request: Request, room_id: int, db: Session = Depends(get_d
             "body_preview": bool(p.body),
         })
     return _templates().TemplateResponse(request, "partials/timeline.html", {"posts": items})
+
+
+from fastapi import Form, status as http_status
+from fastapi.responses import RedirectResponse
+from datetime import datetime
+from server.auth import require_admin
+
+
+@router.get("/admin/new-room", response_class=HTMLResponse)
+def new_room_form(request: Request, _: str = Depends(require_admin)):
+    return _templates().TemplateResponse(request, "admin_new_room.html", {})
+
+
+@router.post("/admin/new-room")
+def new_room_submit(
+    title: str = Form(...),
+    problem: str = Form(...),
+    max_rounds: int = Form(20),
+    db: Session = Depends(get_db),
+    _: str = Depends(require_admin),
+):
+    room = Room(title=title, problem=problem, max_rounds=max_rounds,
+                status="open", created_at=datetime.utcnow())
+    db.add(room); db.commit(); db.refresh(room)
+    return RedirectResponse(url=f"/room/{room.id}", status_code=http_status.HTTP_303_SEE_OTHER)
+
+
+@router.get("/room/{room_id}/post/{post_id}", response_class=HTMLResponse)
+def post_detail(request: Request, room_id: int, post_id: int, db: Session = Depends(get_db)):
+    _room_or_404(db, room_id)
+    post = db.query(Post).filter(Post.id == post_id, Post.room_id == room_id).one_or_none()
+    if not post:
+        err("not_found", "post not found", http=404)
+    return _templates().TemplateResponse(
+        request, "post_detail.html",
+        {"post": type("PostView", (), {
+            "id": post.id, "type": post.type, "room_id": post.room_id,
+            "author_name": post.author.name, "created_at": post.created_at,
+            "parent_id": post.parent_id, "superseded_by": post.superseded_by,
+            "body": post.body,
+        })()})
+
+
+@router.get("/room/{room_id}/audit", response_class=HTMLResponse)
+def room_audit(request: Request, room_id: int, db: Session = Depends(get_db)):
+    room = _room_or_404(db, room_id)
+    from server.models import Read
+    posts = db.query(Post).filter(Post.room_id == room_id).all()
+    reads = (db.query(Read).join(Participant, Read.participant_id == Participant.id)
+             .filter(Participant.room_id == room_id).all())
+    events = []
+    for p in posts:
+        events.append({"ts": p.created_at.isoformat(), "kind": "post", "by": p.author.name,
+                       "detail": f"#{p.id} {p.type}" + (f" → #{p.parent_id}" if p.parent_id else "")})
+    for r in reads:
+        events.append({"ts": r.read_at.isoformat(), "kind": "read", "by": r.participant.name,
+                       "detail": f"read post #{r.post_id}"})
+    events.sort(key=lambda e: e["ts"])
+    return _templates().TemplateResponse(request, "audit.html", {"room": room, "events": events})

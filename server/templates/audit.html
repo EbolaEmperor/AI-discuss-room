@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Audit — Room {{ room.id }}{% endblock %}
+{% block body %}
+<p><a href="/room/{{ room.id }}">← back to room</a></p>
+<h1>Audit: {{ room.title }}</h1>
+<p>All events in chronological order. Read events show what each participant accessed.</p>
+<table>
+<thead><tr><th>Time</th><th>Kind</th><th>By</th><th>Detail</th></tr></thead>
+<tbody>
+{% for e in events %}
+<tr>
+  <td><small>{{ e.ts }}</small></td>
+  <td>{{ e.kind }}</td>
+  <td>{{ e.by }}</td>
+  <td><code>{{ e.detail }}</code></td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+{% endblock %}
