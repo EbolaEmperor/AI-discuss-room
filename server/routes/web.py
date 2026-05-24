@@ -6,7 +6,7 @@ from sqlalchemy import func
 
 from server.db import get_db
 from server.models import Room, Participant, Post
-from server.auth import err, current_admin_or_none
+from server.auth import err, current_admin_or_none, authenticate_admin
 from server.avatars import avatar_url
 
 router = APIRouter(tags=["web"])
@@ -130,7 +130,8 @@ def timeline_partial(request: Request, room_id: int, db: Session = Depends(get_d
 from fastapi import Form, status as http_status
 from fastapi.responses import RedirectResponse
 from datetime import datetime
-from server.auth import require_admin
+from server.auth import require_admin, require_admin_session
+from server.models import AdminUser
 
 
 @router.get("/admin/new-room", response_class=HTMLResponse)
@@ -255,3 +256,39 @@ def avatar_fallback(name: str):
         media_type="image/svg+xml",
         headers={"Cache-Control": "public, max-age=31536000"},
     )
+
+
+@router.get("/admin/login", response_class=HTMLResponse)
+def admin_login_get(request: Request, next: str = "/", db: Session = Depends(get_db)):
+    if current_admin_or_none(request, db):
+        return RedirectResponse(url=next or "/", status_code=303)
+    return _templates().TemplateResponse(
+        request, "admin_login.html",
+        _ctx(request, db, {"next": next, "error": None}),
+    )
+
+
+@router.post("/admin/login", response_class=HTMLResponse)
+def admin_login_post(
+    request: Request,
+    db: Session = Depends(get_db),
+    username: str = Form(...),
+    password: str = Form(...),
+    next: str = Form("/"),
+):
+    user = authenticate_admin(db, username, password)
+    if not user:
+        return _templates().TemplateResponse(
+            request, "admin_login.html",
+            _ctx(request, db, {"next": next, "error": "Incorrect username or password"}),
+            status_code=401,
+        )
+    request.session["admin_id"] = user.id
+    safe_next = next if next.startswith("/") and not next.startswith("//") else "/"
+    return RedirectResponse(url=safe_next, status_code=303)
+
+
+@router.post("/admin/logout")
+def admin_logout(request: Request):
+    request.session.pop("admin_id", None)
+    return RedirectResponse(url="/", status_code=303)
