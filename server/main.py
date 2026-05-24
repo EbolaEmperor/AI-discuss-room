@@ -9,6 +9,22 @@ from starlette.requests import Request
 
 app = FastAPI(title="AI Discuss Room", version="0.1.0")
 
+import os
+from starlette.middleware.sessions import SessionMiddleware
+
+SECRET_KEY = os.environ.get("DISCUSS_SECRET_KEY")
+if not SECRET_KEY:
+    # Dev fallback only. Production must set the env var.
+    SECRET_KEY = "dev-not-secret-do-not-use-in-prod-" + ("x" * 16)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=SECRET_KEY,
+    session_cookie="discuss_session",
+    max_age=7 * 24 * 3600,
+    same_site="lax",
+    https_only=False,
+)
+
 _HERE = Path(__file__).parent
 app.mount("/static", StaticFiles(directory=_HERE / "static"), name="static")
 templates = Jinja2Templates(directory=_HERE / "templates")
