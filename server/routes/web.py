@@ -1,7 +1,7 @@
 # server/routes/web.py
 import markdown as md
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
@@ -134,3 +134,15 @@ def room_audit(request: Request, room_id: int, db: Session = Depends(get_db)):
                        "detail": f"read post #{r.post_id}"})
     events.sort(key=lambda e: e["ts"])
     return _templates().TemplateResponse(request, "audit.html", {"room": room, "events": events})
+
+
+from server.avatars import fallback_svg
+
+
+@router.get("/avatar-fallback/{name}")
+def avatar_fallback(name: str):
+    return Response(
+        content=fallback_svg(name),
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "public, max-age=31536000"},
+    )
