@@ -81,3 +81,15 @@ class Read(Base):
 
     participant = relationship("Participant", back_populates="reads")
     post = relationship("Post")
+
+
+class AdminUser(Base):
+    __tablename__ = "admin_users"
+    __table_args__ = (
+        UniqueConstraint("username", name="uq_admin_username"),
+    )
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String(64), nullable=False)
+    password_hash = Column(String(255), nullable=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow)
