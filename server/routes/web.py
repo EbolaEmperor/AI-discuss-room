@@ -208,7 +208,8 @@ def post_detail(request: Request, room_id: int, post_id: int, db: Session = Depe
             is_reply = False
         comments.append({
             "id": c.id, "type": c.type, "author": c.author.name,
-            "ts": c.created_at, "body": c.body or "",
+            "ts": c.created_at,
+            "body_html": render(c.body) if c.body else "",
             "target_label": target_label, "is_reply": is_reply,
         })
 

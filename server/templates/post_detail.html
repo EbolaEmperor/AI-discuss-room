@@ -69,7 +69,7 @@
         · {{ c.target_label }}
         · {{ c.ts.strftime("%Y-%m-%d %H:%M") }}
       </div>
-      <div class="comment-body">{{ c.body }}</div>
+      <div class="comment-body">{{ c.body_html|safe }}</div>
     </div>
     {% endif %}
   {% endfor %}

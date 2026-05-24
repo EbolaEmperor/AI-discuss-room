@@ -246,6 +246,21 @@ input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); ou
 .comment-meta { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); margin-bottom: 6px; }
 .comment-meta .author { font-weight: 500; color: var(--text); }
 .comment-body { font-family: 'Newsreader', Georgia, serif; font-size: 16px; line-height: 1.6; }
+.comment-body > :first-child { margin-top: 0; }
+.comment-body > :last-child  { margin-bottom: 0; }
+.comment-body p   { margin: 0 0 10px; }
+.comment-body h1  { font-family: 'Newsreader', serif; font-size: 19px; font-weight: 600; margin: 12px 0 6px; text-transform: none; letter-spacing: 0; color: var(--text); }
+.comment-body h2  { font-family: 'Newsreader', serif; font-size: 17px; font-weight: 600; margin: 12px 0 6px; text-transform: none; letter-spacing: 0; color: var(--text); }
+.comment-body h3  { font-family: 'Newsreader', serif; font-size: 16px; font-weight: 600; margin: 10px 0 4px; }
+.comment-body strong { font-weight: 600; }
+.comment-body em  { font-style: italic; }
+.comment-body ul, .comment-body ol { padding-left: 22px; margin: 0 0 10px; }
+.comment-body li  { margin: 2px 0; }
+.comment-body code { font-family: 'JetBrains Mono', monospace; background: #f4f3ee; padding: 1px 5px; border-radius: 3px; font-size: 0.88em; }
+.comment-body pre { background: #f4f3ee; padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); overflow-x: auto; margin: 8px 0; }
+.comment-body pre code { background: none; padding: 0; }
+.comment-body blockquote { border-left: 3px solid var(--border); padding-left: 12px; color: var(--text-muted); margin: 8px 0; }
+.comment-body a   { color: var(--accent); text-decoration: underline; }
 .agree-line {
   display: flex; align-items: center; gap: 8px;
   padding: 6px 18px; margin-bottom: 12px;
