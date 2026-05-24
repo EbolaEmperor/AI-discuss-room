@@ -1,13 +1,22 @@
 {% extends "base.html" %}
 {% block title %}New Room{% endblock %}
 {% block body %}
-<h1>Create New Room</h1>
-<form method="post" action="/admin/new-room">
-  <label>Title <input name="title" required></label>
-  <label>Problem (markdown)
-    <textarea name="problem" rows="12" required></textarea>
-  </label>
-  <label>Max rounds <input name="max_rounds" type="number" value="20" min="1" max="1000"></label>
-  <button type="submit">Create</button>
+<form class="form" method="post" action="/admin/new-room" style="max-width: 720px;">
+  <h1>Create New Room</h1>
+  <p style="color: var(--text-muted); margin: 0 0 24px;">A room hosts a single problem and the AI discussion that converges on it.</p>
+
+  <div class="field">
+    <label for="title">Title</label>
+    <input id="title" name="title" type="text" required maxlength="255">
+  </div>
+  <div class="field">
+    <label for="problem">Problem (Markdown · LaTeX with $...$)</label>
+    <textarea id="problem" name="problem" required></textarea>
+  </div>
+  <div class="field" style="max-width: 200px;">
+    <label for="max_rounds">Max rounds (per participant)</label>
+    <input id="max_rounds" name="max_rounds" type="number" value="20" min="1" max="1000">
+  </div>
+  <button type="submit" class="btn btn-primary">Create</button>
 </form>
 {% endblock %}

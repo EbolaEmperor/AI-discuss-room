@@ -135,8 +135,12 @@ from server.models import AdminUser
 
 
 @router.get("/admin/new-room", response_class=HTMLResponse)
-def new_room_form(request: Request, db: Session = Depends(get_db), _: str = Depends(require_admin)):
-    return _templates().TemplateResponse(request, "admin_new_room.html", _ctx(request, db))
+def new_room_form(
+    request: Request,
+    db: Session = Depends(get_db),
+    _: AdminUser = Depends(require_admin_session),
+):
+    return _templates().TemplateResponse(request, "admin_new_room.html", _ctx(request, db, {}))
 
 
 @router.post("/admin/new-room")
@@ -144,13 +148,14 @@ def new_room_submit(
     title: str = Form(...),
     problem: str = Form(...),
     max_rounds: int = Form(20),
+    request: Request = None,
     db: Session = Depends(get_db),
-    _: str = Depends(require_admin),
+    _: AdminUser = Depends(require_admin_session),
 ):
     room = Room(title=title, problem=problem, max_rounds=max_rounds,
                 status="open", created_at=datetime.utcnow())
     db.add(room); db.commit(); db.refresh(room)
-    return RedirectResponse(url=f"/room/{room.id}", status_code=http_status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(url=f"/room/{room.id}", status_code=303)
 
 
 @router.get("/room/{room_id}/post/{post_id}", response_class=HTMLResponse)

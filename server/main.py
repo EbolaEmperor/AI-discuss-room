@@ -1,6 +1,6 @@
 # server/main.py
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.exceptions import HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -31,7 +31,15 @@ templates = Jinja2Templates(directory=_HERE / "templates")
 
 
 @app.exception_handler(HTTPException)
-async def http_exception_handler(_: Request, exc: HTTPException):
+async def http_exception_handler(request: Request, exc: HTTPException):
+    # For HTML routes that fail auth, redirect to login instead of returning 401 JSON
+    if exc.status_code == 401:
+        accept = request.headers.get("accept", "")
+        if "text/html" in accept and "/admin/" in str(request.url.path):
+            next_url = str(request.url.path)
+            if request.url.query:
+                next_url += "?" + request.url.query
+            return RedirectResponse(url=f"/admin/login?next={next_url}", status_code=303)
     if isinstance(exc.detail, dict) and "error" in exc.detail:
         return JSONResponse(status_code=exc.status_code, content=exc.detail)
     return JSONResponse(
