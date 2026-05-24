@@ -1,5 +1,4 @@
 # server/routes/web.py
-import markdown as md
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
@@ -59,18 +58,56 @@ def room_view(request: Request, room_id: int, db: Session = Depends(get_db)):
                        Post.superseded_by.is_(None)).all())
     current_proofs = []
     for c in current:
-        agrees = db.query(func.count(Post.id)).filter(
-            Post.room_id == room_id, Post.type == "agree", Post.parent_id == c.id
-        ).scalar()
-        current_proofs.append({"id": c.id, "author": c.author.name, "agree_count": agrees})
-    problem_html = md.markdown(room.problem)
+        agrees = (db.query(Post)
+                  .filter(Post.room_id == room_id, Post.type == "agree", Post.parent_id == c.id)
+                  .all())
+        # body preview: first non-empty line
+        preview = ""
+        if c.body:
+            for line in c.body.splitlines():
+                line = line.strip().lstrip("#").strip()
+                if line:
+                    preview = line[:140]
+                    break
+        # version number: count revisions back to root
+        version = 1
+        cur = c
+        while cur.parent_id is not None and cur.type == "revision":
+            version += 1
+            cur = db.query(Post).filter(Post.id == cur.parent_id).one()
+        current_proofs.append({
+            "id": c.id, "author": c.author.name, "preview": preview,
+            "agree_count": len(agrees),
+            "agreed_by": [a.author.name for a in agrees],
+            "ts": c.created_at, "version": version,
+            "is_consensus": (room.status == "closed_consensus" and room.closed_proof_id == c.id),
+        })
+
+    consensus_proof = None
+    if room.status == "closed_consensus" and room.closed_proof_id:
+        cp = db.query(Post).filter(Post.id == room.closed_proof_id).one_or_none()
+        if cp:
+            preview = ""
+            if cp.body:
+                for line in cp.body.splitlines():
+                    line = line.strip().lstrip("#").strip()
+                    if line:
+                        preview = line[:140]
+                        break
+            consensus_proof = {"id": cp.id, "author": cp.author.name, "preview": preview}
+
+    from server.markdown_render import render
+    problem_html = render(room.problem)
     parts = [{"name": p.name, "role": p.role,
               "has_published_first": p.first_post_at is not None}
              for p in participants]
     return _templates().TemplateResponse(
         request, "room.html",
-        _ctx(request, db, {"room": room, "participants": parts, "current_proofs": current_proofs,
-         "problem_html": problem_html}),
+        _ctx(request, db, {
+            "room": room, "participants": parts, "current_proofs": current_proofs,
+            "problem_html": problem_html, "consensus_proof": consensus_proof,
+            "include_katex": True,
+        }),
     )
 
 

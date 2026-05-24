@@ -1,36 +1,89 @@
 {% extends "base.html" %}
 {% block title %}Room {{ room.id }} — {{ room.title }}{% endblock %}
 {% block body %}
-<h1>Room #{{ room.id }} — {{ room.title }}</h1>
-<p><strong>State:</strong> {{ room.status }}
-   {% if room.closed_proof_id %}(consensus proof: #{{ room.closed_proof_id }}){% endif %}
-   | <a href="/room/{{ room.id }}/audit">Audit view</a>
-</p>
+{% from "partials/_avatar.html" import avatar with context %}
 
-<h2>Problem</h2>
-<article>{{ problem_html|safe }}</article>
+<header style="margin-bottom: 8px;">
+  <p style="margin:0 0 4px;"><a href="/" style="color:var(--text-muted);font-size:13px;">← Rooms</a></p>
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+    <h1 style="margin:0;">#{{ room.id }} · {{ room.title }}</h1>
+    <span class="badge state-{{ room.status.replace('_','-') }}">{{ room.status }}</span>
+  </div>
+  <div style="color:var(--text-muted);font-size:13px;margin-top:8px;">
+    Created {{ room.created_at.strftime("%Y-%m-%d") }} ·
+    {{ participants|length }} participants ·
+    <a href="/room/{{ room.id }}/audit">View audit →</a>
+  </div>
+</header>
 
-<h2>Participants</h2>
-<ul>
-  {% for p in participants %}
-  <li>{{ p.name }} ({{ p.role }}){% if p.has_published_first %} ✓ first post submitted{% endif %}</li>
-  {% endfor %}
-</ul>
+<section style="margin: 32px 0;">
+  <h2>Problem</h2>
+  <div class="article" style="margin: 0; font-size: 16px;">
+    {{ problem_html|safe }}
+  </div>
+</section>
 
-<h2>Current proofs</h2>
-<ul>
+<section style="margin: 32px 0;">
+  <h2>Participants</h2>
+  <div style="display:flex;flex-wrap:wrap;gap:16px;">
+    {% for p in participants %}
+    <div style="display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:6px 14px 6px 6px;">
+      {{ avatar(p.name, 32) }}
+      <div>
+        <div style="font-weight:500;">{{ p.name }}</div>
+        <div style="font-size:12px;color:var(--text-muted);">
+          <span class="badge role-{{ p.role }}">{{ p.role }}</span>
+          {% if p.has_published_first %}<span style="margin-left:6px;color:var(--success);">✓ posted</span>{% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+{% if consensus_proof %}
+<section style="margin: 32px 0;">
+  <div class="consensus-banner">
+    <h3>✓ Consensus reached on Post #{{ consensus_proof.id }}</h3>
+    <p>{% if consensus_proof.preview %}"{{ consensus_proof.preview }}"{% endif %}
+       — by <strong>{{ consensus_proof.author }}</strong>, all participants agreed.</p>
+    <p style="margin-top: 10px;"><a href="/room/{{ room.id }}/post/{{ consensus_proof.id }}" class="btn btn-secondary">Read full post →</a></p>
+  </div>
+</section>
+{% endif %}
+
+<section style="margin: 32px 0;">
+  <h2>Current proofs</h2>
   {% for c in current_proofs %}
-  <li>#{{ c.id }} by {{ c.author }} — agreed: ({{ c.agree_count }}/{{ participants|length }})</li>
+  <div class="card {% if c.is_consensus %}consensus-winner{% endif %}">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        {{ avatar(c.author, 32) }}
+        <div>
+          <div style="font-weight:500;">{{ c.author }}</div>
+          <div style="font-size:12px;color:var(--text-muted);">
+            <span class="badge type-proof">Proof v{{ c.version }}</span>
+            · {{ c.ts.strftime("%Y-%m-%d %H:%M") }}
+          </div>
+        </div>
+      </div>
+      {% if c.is_consensus %}<span class="badge consensus-mark">✓ Consensus</span>{% endif %}
+    </div>
+    <div style="margin-top: 12px; font-family: 'Newsreader', serif; font-size: 16px; color: var(--text);">
+      {{ c.preview }}
+    </div>
+    <div style="margin-top: 12px; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted);">
+      <span>agreed:</span>
+      <span class="avatar-stack">
+        {% for n in c.agreed_by %}{{ avatar(n, 24) }}{% endfor %}
+      </span>
+      <span>({{ c.agree_count }}/{{ participants|length }})</span>
+      <a href="/room/{{ room.id }}/post/{{ c.id }}" style="margin-left: auto;">Read full post →</a>
+    </div>
+  </div>
   {% else %}
-  <li><em>No proofs yet.</em></li>
+  <p style="color: var(--text-muted);">No proofs yet.</p>
   {% endfor %}
-</ul>
+</section>
 
-<h2>Timeline</h2>
-<div id="timeline"
-     hx-get="/room/{{ room.id }}/timeline-partial"
-     hx-trigger="load, every 3s"
-     hx-swap="innerHTML">
-  Loading…
-</div>
 {% endblock %}
