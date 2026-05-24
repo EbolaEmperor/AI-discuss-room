@@ -103,3 +103,74 @@ def list_participants(
         {"name": p.name, "role": p.role, "has_published_first": p.first_post_at is not None}
         for p in parts
     ]
+
+
+@router.get("/rooms/{room_id}/status")
+def status(
+    room_id: int,
+    db: Session = Depends(get_db),
+    me: Participant = Depends(require_participant),
+):
+    from server.routes.posts import _post_meta
+    from server.models import Read
+
+    if me.room_id != room_id:
+        err("not_found", "room not found", http=404)
+    room = db.query(Room).filter(Room.id == room_id).one()
+    participant_count = db.query(func.count(Participant.id)).filter(Participant.room_id == room_id).scalar()
+    post_count = db.query(func.count(Post.id)).filter(Post.room_id == room_id).scalar()
+
+    me_summary = {
+        "name": me.name,
+        "role": me.role,
+        "has_published_first": me.first_post_at is not None,
+        "first_post_id": None,
+        "first_post_at": me.first_post_at,
+    }
+    if me.first_post_at is not None:
+        first = (db.query(Post)
+                 .filter(Post.room_id == room_id, Post.author_id == me.id, Post.type == "proof")
+                 .order_by(Post.id.asc()).first())
+        me_summary["first_post_id"] = first.id if first else None
+
+    redacted = (me.role == "producer" and me.first_post_at is None)
+
+    new_since = []
+    proofs_out = []
+    if not redacted:
+        max_read = (db.query(func.max(Read.post_id))
+                    .filter(Read.participant_id == me.id).scalar()) or 0
+        new_q = (db.query(Post)
+                 .filter(Post.room_id == room_id, Post.id > max_read)
+                 .order_by(Post.id.asc()).all())
+        new_since = [_post_meta(p) for p in new_q]
+
+        current = (db.query(Post)
+                   .filter(Post.room_id == room_id,
+                           Post.type.in_(("proof", "revision")),
+                           Post.superseded_by.is_(None))
+                   .order_by(Post.id.asc()).all())
+        for proof in current:
+            agrees = (db.query(Post)
+                      .filter(Post.room_id == room_id, Post.type == "agree",
+                              Post.parent_id == proof.id).all())
+            proofs_out.append({
+                "id": proof.id,
+                "author": proof.author.name,
+                "agree_count": len(agrees),
+                "agreed_by_me": any(a.author_id == me.id for a in agrees),
+            })
+
+    return {
+        "room": {
+            "id": room.id,
+            "title": room.title,
+            "state": room.status,
+            "participant_count": participant_count,
+            "post_count": post_count,
+            "max_rounds": room.max_rounds,
+        },
+        "me": me_summary,
+        "new_since_my_last_read": new_since,
+        "current_proofs": proofs_out,
+    }
