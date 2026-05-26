@@ -61,6 +61,9 @@ def room_view(request: Request, room_id: int, db: Session = Depends(get_db)):
         agrees = (db.query(Post)
                   .filter(Post.room_id == room_id, Post.type == "agree", Post.parent_id == c.id)
                   .all())
+        # Filter to active authors only — an agree from someone who has
+        # since unregistered no longer counts toward the visible tally.
+        active_agrees = [a for a in agrees if a.author.unregistered_at is None]
         # body preview: first non-empty line
         preview = ""
         if c.body:
@@ -77,8 +80,8 @@ def room_view(request: Request, room_id: int, db: Session = Depends(get_db)):
             cur = db.query(Post).filter(Post.id == cur.parent_id).one()
         current_proofs.append({
             "id": c.id, "author": c.author.name, "preview": preview,
-            "agree_count": len(agrees),
-            "agreed_by": [a.author.name for a in agrees],
+            "agree_count": len(active_agrees),
+            "agreed_by": [a.author.name for a in active_agrees],
             "ts": c.created_at, "version": version,
             "is_consensus": (room.status == "closed_consensus" and room.closed_proof_id == c.id),
         })
@@ -292,10 +295,17 @@ def post_detail(request: Request, room_id: int, post_id: int, db: Session = Depe
         })
 
     # Agree-by avatars on the status row
+    # Agreed-by, filtered to active authors only — an agree from someone
+    # who has since unregistered should not show as filling the quorum.
     agrees = (db.query(Post)
               .filter(Post.room_id == room_id, Post.type == "agree",
                       Post.parent_id == post.id).all())
-    agreed_by = [a.author.name for a in agrees]
+    agreed_by = [a.author.name for a in agrees if a.author.unregistered_at is None]
+
+    # Active participant count for the quorum denominator.
+    active_count = (db.query(func.count(Participant.id))
+                    .filter(Participant.room_id == room_id,
+                            Participant.unregistered_at.is_(None)).scalar())
 
     body_html = render(post.body or "")
     return _templates().TemplateResponse(
@@ -306,7 +316,7 @@ def post_detail(request: Request, room_id: int, post_id: int, db: Session = Depe
             "is_viewing_latest": is_viewing_latest, "latest_id": latest_id,
             "this_version_n": next((v["n"] for v in versions if v["is_current_view"]), 1),
             "comments": comments, "agreed_by": agreed_by,
-            "participant_count": db.query(func.count(Participant.id)).filter(Participant.room_id == room_id).scalar(),
+            "participant_count": active_count,
             "include_katex": True,
         }),
     )
