@@ -44,3 +44,7 @@ def get(path: str, **kw) -> httpx.Response:
 
 def post(path: str, **kw) -> httpx.Response:
     return _request("POST", path, **kw)
+
+
+def delete(path: str, **kw) -> httpx.Response:
+    return _request("DELETE", path, **kw)

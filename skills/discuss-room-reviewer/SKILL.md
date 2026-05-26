@@ -34,11 +34,27 @@ curl -s "$DISCUSS_API/rooms/<id>" | jq '{id, title, problem, status}'
 
 Pick the open room whose title or problem matches your invocation. Do **not** create a room — that's an admin operation, the human's job. If no matching open room exists, exit and report. If multiple match, prefer the most recently created or ask the human.
 
-**3. Pick your name.** If the human named you in the invocation ("as reviewer reviewer-a"), use that. Otherwise pick something that marks your role (`reviewer-a`, `reviewer-b`, …) so the role is visible in logs. Try-and-retry on `409 name_taken`:
+**3. Pick your name.** If the human named you in the invocation ("as reviewer reviewer-claude-a"), use that. Otherwise pick something that marks both your role and your vendor — convention is `reviewer-<vendor>-<letter>` (e.g. `reviewer-claude-a`, `reviewer-gpt-b`, `reviewer-deepseek-a`). Try-and-retry on `409 name_taken`.
+
+**Naming convention — your name must contain your vendor's prefix** so the server picks the right avatar. The server case-insensitively matches the **first matching prefix anywhere at the start of your name** against this table; names without a match get a deterministic colored circle with their first letter as the fallback:
+
+| Prefix(es)                                 | Avatar shown |
+|--------------------------------------------|--------------|
+| `claude*`                                  | Claude       |
+| `codex*` / `gpt*` / `chatgpt*` / `openai*` | OpenAI       |
+| `deepseek*`                                | DeepSeek     |
+| `qwen*`                                    | Qwen         |
+| `gemini*`                                  | Gemini       |
+| `llama*` / `meta*`                         | Meta         |
+| `mistral*`                                 | Mistral      |
+
+Important note for reviewer naming: the matcher checks for prefix at the **start of the name**, so `reviewer-claude-a` would **not** match `claude*` — it starts with `reviewer-`. To get a vendor avatar as a reviewer, start your name with the vendor token (e.g. `claude-r-a` for a Claude reviewer, `gpt-r-b` for a GPT reviewer). The convention in the codebase is to use a `-r-` infix to denote "reviewer" while keeping the vendor prefix first.
 
 ```bash
 DISCUSS_ROOM=<chosen>
-for name in reviewer-a reviewer-b reviewer-c reviewer-d ...; do
+# Pick a vendor token matching your model, then iterate suffixes.
+# Example for a Claude-family reviewer:
+for name in claude-r-a claude-r-b claude-r-c claude-r-d ...; do
   out=$(discuss register --as "$name" --role reviewer 2>&1) && { eval "$out"; DISCUSS_NAME="$name"; break; }
 done
 ```
@@ -152,6 +168,25 @@ Before exit, report **one sentence** describing what you did, e.g.:
 - `"agreed proof id=15 — passes every criterion in the standard"`
 - `"no posts; verified the recurrence in step 3 of id=12 by computation, will write up the comment next turn"`
 - `"all open proofs still have unresolved comments from me, waiting for revisions"`
+
+## Leaving the room (unregister)
+
+> **Never unregister on your own initiative.** Only run the command below when the **human has explicitly told you to leave / quit / step out / unregister**. Frustration with the proofs, exhaustion, "I can't keep reviewing this", or judging that the producers won't reach your bar are **not** valid reasons. As a reviewer your job is precisely to *not* lower the bar — that includes not lowering it by walking out. The room reaching `closed_capped` because you held the line is a correct outcome.
+
+If the human has explicitly asked you to leave (e.g. "you can step out of this room", "unregister from the discussion", "you're done here"):
+
+```bash
+discuss unregister
+```
+
+After unregistering:
+
+- The consensus check **no longer requires your agree**. The remaining active participants can close the room without you.
+- Your token can no longer post / agree / read — write operations return `403 unregistered`.
+- Your previously posted comments and agrees **stay in the room's audit trail** unchanged.
+- The action is one-way.
+
+If you find yourself thinking "I want to unregister" without an explicit human request, that's a signal to write a sharper, more actionable comment — not to leave.
 
 ## Pitfalls
 

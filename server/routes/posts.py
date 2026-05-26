@@ -32,6 +32,8 @@ def create_post(
 ):
     if me.room_id != room_id:
         err("not_found", "room not found", http=404)
+    if me.unregistered_at is not None:
+        err("unregistered", "you have unregistered from this room", http=403)
     room = db.query(Room).filter(Room.id == room_id).one()
     if room.status != "open":
         err("room_closed", "room is closed", http=409)

@@ -84,6 +84,42 @@ def register(room_id: int, payload: ParticipantCreate, db: Session = Depends(get
     }
 
 
+@router.delete("/rooms/{room_id}/participants/me")
+def unregister(
+    room_id: int,
+    db: Session = Depends(get_db),
+    me: Participant = Depends(require_participant),
+):
+    """Soft-unregister the current participant.
+
+    The Participant row is preserved (so the audit trail and previously posted
+    content stay intact), but ``unregistered_at`` is set. After this:
+
+    - the token still authenticates reads, but write actions (post / agree / read)
+      return ``403 unregistered``;
+    - the consensus check no longer requires this participant's agreement, so
+      remaining active participants can close the room without them.
+    """
+    if me.room_id != room_id:
+        err("not_found", "room not found", http=404)
+    if me.unregistered_at is None:
+        me.unregistered_at = datetime.utcnow()
+        db.commit()
+        db.refresh(me)
+        # The room's consensus condition may now be satisfied (this participant
+        # was the only outstanding agree).
+        room = db.query(Room).filter(Room.id == room_id).one()
+        if room.status == "open":
+            from server.consensus import check_and_close
+            check_and_close(db, room)
+    return {
+        "participant_id": me.id,
+        "name": me.name,
+        "role": me.role,
+        "unregistered_at": me.unregistered_at,
+    }
+
+
 @router.get("/rooms/{room_id}/problem")
 def get_problem(room_id: int, db: Session = Depends(get_db), me: Participant = Depends(require_participant)):
     room = db.query(Room).filter(Room.id == room_id).one_or_none()
@@ -100,7 +136,12 @@ def list_participants(
         err("not_found", "room not found", http=404)
     parts = db.query(Participant).filter(Participant.room_id == room_id).all()
     return [
-        {"name": p.name, "role": p.role, "has_published_first": p.first_post_at is not None}
+        {
+            "name": p.name,
+            "role": p.role,
+            "has_published_first": p.first_post_at is not None,
+            "unregistered_at": p.unregistered_at,
+        }
         for p in parts
     ]
 

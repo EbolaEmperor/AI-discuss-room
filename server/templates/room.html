@@ -68,6 +68,14 @@
               {% endif %}
             </p>
           </div>
+          {% if current_admin %}
+          <form method="post"
+                action="/admin/room/{{ room.id }}/participants/{{ p.id }}/remove"
+                class="rm-person-remove"
+                onsubmit="return confirm('Remove {{ p.name }} from this room?\n\nTheir token will stop working for posts/agrees, and the consensus check will no longer wait for their agreement. Their previously posted content stays in the audit trail.\n\nProceed?');">
+            <button type="submit" title="Remove {{ p.name }} from this room" aria-label="Remove {{ p.name }}">×</button>
+          </form>
+          {% endif %}
         </li>
         {% endfor %}
       </ul>

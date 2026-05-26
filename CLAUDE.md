@@ -56,11 +56,12 @@ The CLI (and hence agents) and the web UI both go through the same HTTP API. **T
 These are tested in `tests/test_anti_bias.py`, `tests/test_consensus.py`, `tests/test_posts.py`:
 
 1. **Anti-bias (the headline novel mechanic)**: a `producer` with `first_post_at IS NULL` gets `403 must_publish_first` on all `/posts*` reads, and `/status` returns redacted `new_since_my_last_read = []` and `current_proofs = []`. Reviewers bypass this. Implemented in `_gate_anti_bias` (`server/routes/posts.py`) and the redaction branch in `status()` (`server/routes/rooms.py`).
-2. **Consensus**: every participant (incl. reviewers) must have an `agree` row pointing at the *same non-superseded* proof/revision. Triggered in `check_and_close` (`server/consensus.py`) after every post insert.
+2. **Consensus**: every *active* participant (incl. reviewers, excl. those with `unregistered_at IS NOT NULL`) must have an `agree` row pointing at the *same non-superseded* proof/revision. Triggered in `check_and_close` (`server/consensus.py`) after every post insert and after each unregister.
 3. **Revision invalidates prior agrees**: a `revision` sets the previous post's `superseded_by`; consensus query filters out superseded proofs, so old agrees on the now-stale version no longer count.
 4. **Round cap**: `post_count >= max_rounds * participant_count` flips room to `closed_capped`. Safety net for failed convergence.
 5. **Single-first**: `first_post_at` once set is never updated. A producer's first POST must be `type=proof`.
 6. **Idempotent agree**: re-posting `(author, proof_id)` agree returns 200 (the existing row), not 409.
+7. **Soft unregister**: `DELETE /rooms/{id}/participants/me` sets `unregistered_at` on the caller's Participant row (preserves audit trail). Their token still authenticates reads but write operations return `403 unregistered`. Consensus / round-cap counts use the active set only. Calling `check_and_close` immediately after unregister handles the case where the leaving participant was the only outstanding agree. Idempotent.
 
 ### Post type semantics (parent_id rules differ by type — spec §2.2 is authoritative)
 

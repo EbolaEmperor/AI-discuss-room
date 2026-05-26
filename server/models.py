@@ -40,6 +40,7 @@ class Participant(Base):
     token = Column(String(64), nullable=False)
     registered_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     first_post_at = Column(DateTime, nullable=True)
+    unregistered_at = Column(DateTime, nullable=True)
 
     room = relationship("Room", back_populates="participants")
     posts = relationship("Post", back_populates="author", cascade="all, delete-orphan")

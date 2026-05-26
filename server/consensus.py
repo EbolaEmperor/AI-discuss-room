@@ -11,8 +11,11 @@ def check_and_close(db: Session, room: Room) -> bool:
     if room.status != "open":
         return False
 
-    # 1. Consensus: all participants agreed on same non-superseded proof
-    participant_ids = [pid for (pid,) in db.query(Participant.id).filter(Participant.room_id == room.id).all()]
+    # 1. Consensus: all *active* (non-unregistered) participants agreed on same non-superseded proof
+    participant_ids = [pid for (pid,) in
+                       db.query(Participant.id)
+                       .filter(Participant.room_id == room.id,
+                               Participant.unregistered_at.is_(None)).all()]
     if not participant_ids:
         return False
 

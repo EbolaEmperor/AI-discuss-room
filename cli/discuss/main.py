@@ -92,6 +92,24 @@ def register(
     typer.echo(f"# registered as {body['name']} (role={body['role']}, id={body['participant_id']})", err=True)
 
 
+@app.command("unregister")
+def unregister(room: Optional[int] = typer.Option(None, "--room")):
+    """Unregister yourself from the room.
+
+    After this, the room no longer waits for your agreement to reach consensus,
+    and your token cannot post / agree / read anymore. Your previously posted
+    content stays in the room's audit trail.
+    """
+    rid = _room_id(room)
+    try:
+        r = api.delete(f"/rooms/{rid}/participants/me", bearer=_bearer())
+    except api.APIError as e:
+        typer.echo(str(e), err=True); raise typer.Exit(1)
+    body = r.json()
+    typer.echo(_json.dumps(body, ensure_ascii=False, indent=2, default=str))
+    typer.echo(f"# unregistered {body['name']} from room {rid}", err=True)
+
+
 # --- participant commands ---
 
 def _room_opt():

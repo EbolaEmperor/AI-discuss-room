@@ -98,9 +98,12 @@ def room_view(request: Request, room_id: int, db: Session = Depends(get_db)):
 
     from server.markdown_render import render
     problem_html = render(room.problem)
-    parts = [{"name": p.name, "role": p.role,
+    # Hide unregistered participants entirely; the participant count + the
+    # rail list reflect active membership only.
+    parts = [{"id": p.id, "name": p.name, "role": p.role,
               "has_published_first": p.first_post_at is not None}
-             for p in participants]
+             for p in participants
+             if p.unregistered_at is None]
     post_count = db.query(func.count(Post.id)).filter(Post.room_id == room_id).scalar()
     return _templates().TemplateResponse(
         request, "room.html",
@@ -193,6 +196,35 @@ def edit_problem_submit(
     room.problem = problem
     db.commit()
     return RedirectResponse(url=f"/room/{room.id}", status_code=303)
+
+
+@router.post("/admin/room/{room_id}/participants/{participant_id}/remove")
+def admin_remove_participant(
+    room_id: int,
+    participant_id: int,
+    db: Session = Depends(get_db),
+    _: AdminUser = Depends(require_admin_session),
+):
+    """Admin-side soft-unregister: kicks an inactive participant out.
+
+    Same effect as the participant calling DELETE /rooms/{id}/participants/me
+    on themselves — sets unregistered_at, preserves their post history, and
+    re-runs the consensus check (the kicked participant was potentially the
+    only outstanding agree).
+    """
+    room = _room_or_404(db, room_id)
+    p = (db.query(Participant)
+         .filter(Participant.id == participant_id, Participant.room_id == room_id)
+         .one_or_none())
+    if not p:
+        err("not_found", "participant not found", http=404)
+    if p.unregistered_at is None:
+        p.unregistered_at = datetime.utcnow()
+        db.commit()
+        if room.status == "open":
+            from server.consensus import check_and_close
+            check_and_close(db, room)
+    return RedirectResponse(url=f"/room/{room_id}", status_code=303)
 
 
 @router.post("/admin/render-markdown", response_class=HTMLResponse)

@@ -986,6 +986,39 @@ body:has(main.rm-page) {
   display: flex;
   align-items: center;
   gap: 12px;
+  position: relative;
+}
+.rm-person-remove {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.14s ease;
+}
+.rm-person:hover .rm-person-remove,
+.rm-person-remove:focus-within { opacity: 1; }
+.rm-person-remove button {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  line-height: 1;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  padding: 0;
+  cursor: pointer;
+  transition: color 0.14s ease, border-color 0.14s ease, background 0.14s ease;
+}
+.rm-person-remove button:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: var(--danger-bg);
+}
+.rm-person-remove button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 .rm-person-body { min-width: 0; }
 .rm-person-name {

@@ -27,9 +27,20 @@ if lsof -ti tcp:"$PORT" >/dev/null 2>&1; then
   sleep 1
 fi
 
+# DISCUSS_DEV_RELOAD=1 enables uvicorn --reload (watches *.py edits and
+# restarts the worker). Templates/CSS/JS are already served per-request, so
+# they don't need it. Off by default — leaving it always on slows startup
+# and pulls in the watcher's file-descriptor cost.
+RELOAD_FLAG=""
+if [[ "${DISCUSS_DEV_RELOAD:-0}" == "1" || "${DISCUSS_DEV_RELOAD:-}" == "true" ]]; then
+  RELOAD_FLAG="--reload --reload-dir server"
+  echo "(hot reload enabled — watching server/)"
+fi
+
 echo "starting uvicorn on $HOST:$PORT (db=$DB)..."
 DATABASE_URL="$DB" nohup uvicorn server.main:app \
   --host "$HOST" --port "$PORT" \
+  $RELOAD_FLAG \
   >"$LOG_FILE" 2>&1 &
 echo $! > "$PID_FILE"
 disown || true
