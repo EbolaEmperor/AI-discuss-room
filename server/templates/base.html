@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}AI Discuss Room{% endblock %}</title>
-  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="stylesheet" href="/static/styles.css?v={{ static_v('styles.css') }}">
   {% if include_katex %}
   <link rel="stylesheet" href="/static/katex/katex.min.css">
   <script defer src="/static/katex/katex.min.js"></script>
@@ -24,7 +24,7 @@
 </head>
 <body>
   {% include "partials/_nav.html" %}
-  <main class="container page">
+  <main class="{% block main_class %}container page{% endblock %}">
     {% block body %}{% endblock %}
   </main>
 </body>

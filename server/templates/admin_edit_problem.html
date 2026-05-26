@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Edit Problem — Room {{ room.id }}{% endblock %}
+{% block main_class %}edit-fullscreen ep-page{% endblock %}
+{% block body %}
+<form method="post" action="/admin/room/{{ room.id }}/edit-problem" class="ep-form" data-ep-form>
+
+  <header class="ep-header">
+    <div class="ep-header-block">
+      <p class="ep-eyebrow">Edit Problem</p>
+      <h1 class="ep-title">
+        <span class="ep-title-lead">Room</span>
+        <span class="ep-roomnum">№&nbsp;{{ room.id }}</span>
+        <span class="ep-em">—</span>
+        <span class="ep-roomtitle">{{ room.title }}</span>
+      </h1>
+    </div>
+    <div class="ep-header-actions">
+      <span class="ep-state" data-ep-state aria-live="polite"></span>
+      <a href="/room/{{ room.id }}" class="ep-cancel">Discard</a>
+      <button type="submit" class="ep-save">Save problem</button>
+    </div>
+  </header>
+
+  {% if participant_count > 0 or post_count > 0 %}
+  <aside class="ep-notice" role="note">
+    <span class="ep-notice-mark">Notice</span>
+    <p>
+      <strong>This room already has activity.</strong>
+      {{ participant_count }} participant{{ '' if participant_count == 1 else 's' }} registered,
+      {{ post_count }} post{{ '' if post_count == 1 else 's' }} so far.
+      Editing the problem now may make existing proofs and comments no longer match the new statement.
+      Consider closing this room and creating a new one instead.
+    </p>
+  </aside>
+  {% endif %}
+
+  <div class="ep-workspace">
+    <section class="ep-pane ep-pane-editor" aria-label="Manuscript">
+      <header class="ep-pane-head">
+        <span class="ep-pane-num">01</span>
+        <span class="ep-pane-name">Manuscript</span>
+        <span class="ep-pane-hint">Markdown · LaTeX with $&hellip;$</span>
+      </header>
+      <div class="ep-editor-canvas">
+        <textarea id="problem" name="problem" required
+                  hx-post="/admin/render-markdown"
+                  hx-target="#problem-preview"
+                  hx-swap="innerHTML"
+                  hx-trigger="input changed delay:300ms"
+                  spellcheck="false"
+                  data-ep-input>{{ room.problem }}</textarea>
+      </div>
+    </section>
+
+    <section class="ep-pane ep-pane-preview" aria-label="Typeset preview">
+      <header class="ep-pane-head">
+        <span class="ep-pane-num">02</span>
+        <span class="ep-pane-name">Typeset</span>
+        <span class="ep-pane-hint">Live preview · KaTeX</span>
+      </header>
+      <div class="ep-preview-canvas">
+        <article id="problem-preview" class="ep-preview">
+          {{ problem_html|safe }}
+        </article>
+      </div>
+    </section>
+  </div>
+</form>
+
+<script>
+  // 1) Re-render KaTeX on the preview after each HTMX swap.
+  document.body.addEventListener('htmx:afterSwap', function (e) {
+    if (!e.detail || !e.detail.target) return;
+    if (e.detail.target.id !== 'problem-preview') return;
+    if (typeof renderMathInElement === 'function') {
+      renderMathInElement(e.detail.target, {
+        delimiters: [
+          {left: '$$', right: '$$', display: true},
+          {left: '$',  right: '$',  display: false},
+          {left: '\\[', right: '\\]', display: true},
+          {left: '\\(', right: '\\)', display: false}
+        ],
+        throwOnError: false
+      });
+    }
+    // Subtle flash on the preview pane so the admin perceives the update.
+    var canvas = document.querySelector('.ep-preview-canvas');
+    if (canvas) {
+      canvas.classList.remove('ep-flash');
+      void canvas.offsetWidth;
+      canvas.classList.add('ep-flash');
+    }
+  });
+
+  // 2) Dirty-state indicator: show "Unsaved changes" once the textarea diverges
+  //    from its on-load value; switch to "Saving..." on submit.
+  (function () {
+    var form  = document.querySelector('[data-ep-form]');
+    var input = document.querySelector('[data-ep-input]');
+    var state = document.querySelector('[data-ep-state]');
+    if (!form || !input || !state) return;
+    var original = input.value;
+    function refresh() {
+      if (input.value !== original) {
+        state.textContent = 'Unsaved changes';
+        state.dataset.kind = 'dirty';
+      } else {
+        state.textContent = '';
+        delete state.dataset.kind;
+      }
+    }
+    input.addEventListener('input', refresh);
+    form.addEventListener('submit', function () {
+      state.textContent = 'Saving…';
+      state.dataset.kind = 'saving';
+    });
+  })();
+</script>
+{% endblock %}

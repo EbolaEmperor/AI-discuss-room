@@ -101,11 +101,13 @@ def room_view(request: Request, room_id: int, db: Session = Depends(get_db)):
     parts = [{"name": p.name, "role": p.role,
               "has_published_first": p.first_post_at is not None}
              for p in participants]
+    post_count = db.query(func.count(Post.id)).filter(Post.room_id == room_id).scalar()
     return _templates().TemplateResponse(
         request, "room.html",
         _ctx(request, db, {
             "room": room, "participants": parts, "current_proofs": current_proofs,
             "problem_html": problem_html, "consensus_proof": consensus_proof,
+            "post_count": post_count,
             "include_katex": True,
         }),
     )
@@ -156,6 +158,50 @@ def new_room_submit(
                 status="open", created_at=datetime.utcnow())
     db.add(room); db.commit(); db.refresh(room)
     return RedirectResponse(url=f"/room/{room.id}", status_code=303)
+
+
+@router.get("/admin/room/{room_id}/edit-problem", response_class=HTMLResponse)
+def edit_problem_form(
+    request: Request,
+    room_id: int,
+    db: Session = Depends(get_db),
+    _: AdminUser = Depends(require_admin_session),
+):
+    room = _room_or_404(db, room_id)
+    pc = db.query(func.count(Participant.id)).filter(Participant.room_id == room_id).scalar()
+    postc = db.query(func.count(Post.id)).filter(Post.room_id == room_id).scalar()
+    from server.markdown_render import render
+    return _templates().TemplateResponse(
+        request, "admin_edit_problem.html",
+        _ctx(request, db, {
+            "room": room, "participant_count": pc, "post_count": postc,
+            "problem_html": render(room.problem),
+            "include_katex": True,
+        }),
+    )
+
+
+@router.post("/admin/room/{room_id}/edit-problem")
+def edit_problem_submit(
+    room_id: int,
+    problem: str = Form(...),
+    request: Request = None,
+    db: Session = Depends(get_db),
+    _: AdminUser = Depends(require_admin_session),
+):
+    room = _room_or_404(db, room_id)
+    room.problem = problem
+    db.commit()
+    return RedirectResponse(url=f"/room/{room.id}", status_code=303)
+
+
+@router.post("/admin/render-markdown", response_class=HTMLResponse)
+def render_markdown_fragment(
+    problem: str = Form(""),
+    _: AdminUser = Depends(require_admin_session),
+):
+    from server.markdown_render import render
+    return HTMLResponse(render(problem))
 
 
 @router.get("/room/{room_id}/post/{post_id}", response_class=HTMLResponse)

@@ -1,79 +1,144 @@
 {% extends "base.html" %}
 {% block title %}#{{ post.id }} — Room {{ room.id }}{% endblock %}
+{% block main_class %}page post-page pd-page{% endblock %}
 {% block body %}
 {% from "partials/_avatar.html" import avatar with context %}
 
-<p style="margin: 0 0 12px;"><a href="/room/{{ room.id }}" style="color:var(--text-muted);font-size:13px;">← back to Room #{{ room.id }}</a></p>
+{# Discussion list = real comments only (agree-events live in Agreed-by, not duplicated here). #}
+{% set discussion = comments|rejectattr('type', 'equalto', 'agree')|list %}
+{% set has_discussion = discussion|length > 0 %}
+{% set show_agreed = post.type in ('proof','revision') %}
 
 {% if not is_viewing_latest and post.type in ('proof','revision') %}
-<div class="superseded-banner">
-  ⚠ You're viewing v{{ this_version_n }} (superseded).
-  <a href="/room/{{ room.id }}/post/{{ latest_id }}">Read latest →</a>
-</div>
+<aside class="pd-archived" role="note">
+  <span class="pd-archived-stamp">Archived</span>
+  <span class="pd-archived-text">
+    Reading <strong>v{{ this_version_n }}</strong> of {{ versions|length }}.
+  </span>
+  <a href="/room/{{ room.id }}/post/{{ latest_id }}" class="pd-archived-link">Read the latest →</a>
+</aside>
 {% endif %}
 
-<header class="article" style="font-family: 'Inter', sans-serif;">
-  <div class="post-meta">
-    {{ avatar(post_author, 48) }}
-    <div>
-      <div class="author-name">{{ post_author }}</div>
-      <div class="muted">
-        <span class="badge type-{{ post.type }}">{{ post.type }}{% if post.type in ('proof','revision') %} v{{ this_version_n }}{% endif %}</span>
-        · {{ post.created_at.strftime("%Y-%m-%d %H:%M") }}
+<header class="pd-masthead">
+  <div class="pd-mast-rail">
+    <a href="/room/{{ room.id }}" class="pd-backlink">← Room №{{ room.id }}</a>
+    {% if versions|length > 1 %}
+    <div class="pd-version-picker">
+      <label for="version-select">Version</label>
+      <div class="pd-select-wrap">
+        <select id="version-select" onchange="if(this.value){window.location='/room/{{ room.id }}/post/'+this.value;}">
+          {% for v in versions %}
+          <option value="{{ v.id }}" {% if v.is_current_view %}selected{% endif %}>
+            v{{ v.n }} · {{ v.label_state }} · {{ v.ts.strftime("%Y-%m-%d") }}
+          </option>
+          {% endfor %}
+        </select>
       </div>
     </div>
-    {% if versions|length > 1 %}
-    <div class="version-picker">
-      <label for="version-select" style="color:var(--text-muted);">Viewing:</label>
-      <select id="version-select" onchange="if(this.value){window.location='/room/{{ room.id }}/post/'+this.value;}">
-        {% for v in versions %}
-        <option value="{{ v.id }}" {% if v.is_current_view %}selected{% endif %}>
-          v{{ v.n }} ({{ v.label_state }} · {{ v.ts.strftime("%Y-%m-%d") }})
-        </option>
-        {% endfor %}
-      </select>
-    </div>
     {% endif %}
+  </div>
+
+  <div class="pd-colophon">
+    <div class="pd-signature">
+      {{ avatar(post_author, 48) }}
+      <div class="pd-signature-text">
+        <p class="pd-signed-by">Signed by</p>
+        <h1 class="pd-signature-name">{{ post_author }}</h1>
+      </div>
+    </div>
+
+    <dl class="pd-imprint">
+      <div class="pd-imprint-row">
+        <dt>Kind</dt>
+        <dd><span class="pd-type-mark pd-type-{{ post.type }}">{{ post.type }}{% if post.type in ('proof','revision') %} · v{{ this_version_n }}{% endif %}</span></dd>
+      </div>
+      <div class="pd-imprint-row">
+        <dt>Post</dt>
+        <dd class="pd-imprint-mono">№{{ post.id }}</dd>
+      </div>
+      <div class="pd-imprint-row">
+        <dt>Filed</dt>
+        <dd class="pd-imprint-mono">{{ post.created_at.strftime("%Y-%m-%d · %H:%M") }}</dd>
+      </div>
+    </dl>
   </div>
 </header>
 
-<article class="article">
-  {{ body_html|safe }}
-</article>
+{% macro agreed_block(in_rail) -%}
+  <header class="rm-section-head">
+    <span class="rm-section-num">01</span>
+    <span class="rm-section-name">Agreed by</span>
+    <span class="rm-section-meta">{{ agreed_by|length }} / {{ participant_count }}</span>
+  </header>
+  {% if participant_count > 0 %}
+  <div class="pd-quorum-tally" aria-label="{{ agreed_by|length }} of {{ participant_count }} participants have agreed">
+    {% for _ in agreed_by %}<span class="pd-quorum-mark"></span>{% endfor %}
+    {% for _ in range(participant_count - agreed_by|length) %}<span class="pd-quorum-mark is-empty"></span>{% endfor %}
+  </div>
+  {% endif %}
+  {% if agreed_by %}
+  <ul class="pd-agree-list {% if not in_rail %}is-foot{% endif %}">
+    {% for n in agreed_by %}
+    <li class="pd-agree-item">
+      {{ avatar(n, 28) }}
+      <span class="pd-agree-name">{{ n }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="rm-empty">Awaiting endorsement.</p>
+  {% endif %}
+{%- endmacro %}
 
-{% if post.type in ('proof','revision') %}
-<div class="post-status">
-  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-    <span>Agreed by:</span>
-    {% for n in agreed_by %}<span style="display:inline-flex;align-items:center;gap:6px;">{{ avatar(n, 24) }} {{ n }}</span>{% if not loop.last %} ·{% endif %}{% endfor %}
-    {% if not agreed_by %}<span style="color:var(--text-muted);">no agrees yet</span>{% endif %}
-    <span style="color:var(--text-muted);margin-left:auto;">({{ agreed_by|length }}/{{ participant_count }})</span>
+{% if has_discussion %}
+<div class="pd-split pd-split-50">
+  <article class="pd-body article">
+    {{ body_html|safe }}
+  </article>
+
+  <aside class="pd-rail">
+    {% if show_agreed %}
+    <section class="pd-side">
+      {{ agreed_block(true) }}
+    </section>
+    {% endif %}
+
+    <section class="pd-side">
+      <header class="rm-section-head">
+        <span class="rm-section-num">{% if show_agreed %}02{% else %}01{% endif %}</span>
+        <span class="rm-section-name">Discussion</span>
+        <span class="rm-section-meta">{{ discussion|length }}</span>
+      </header>
+      <ol class="pd-comments">
+        {% for c in discussion %}
+        <li class="pd-comment{% if c.is_reply %} is-reply{% endif %}">
+          <header class="pd-comment-head">
+            {{ avatar(c.author, 24) }}
+            <div class="pd-comment-by">
+              <span class="pd-comment-author">{{ c.author }}</span>
+              <span class="pd-comment-target">{{ c.target_label }}</span>
+            </div>
+            <time class="pd-comment-time">{{ c.ts.strftime("%m-%d %H:%M") }}</time>
+          </header>
+          <div class="pd-comment-content">{{ c.body_html|safe }}</div>
+        </li>
+        {% endfor %}
+      </ol>
+    </section>
+  </aside>
+</div>
+{% else %}
+<div class="pd-solo">
+  <div class="pd-solo-inner">
+    <article class="pd-body pd-body-solo article">
+      {{ body_html|safe }}
+    </article>
+    {% if show_agreed %}
+    <section class="pd-agreed-foot">
+      {{ agreed_block(false) }}
+    </section>
+    {% endif %}
   </div>
 </div>
 {% endif %}
-
-{% if comments %}
-<section class="comments">
-  <h3 class="comments-heading">Discussion · {{ comments|length }} {% if comments|length == 1 %}reply{% else %}replies{% endif %}</h3>
-  {% for c in comments %}
-    {% if c.type == 'agree' %}
-    <div class="agree-line">
-      {{ avatar(c.author, 24) }}
-      <strong>{{ c.author }}</strong> agreed · <span style="color:var(--text-muted);">{{ c.ts.strftime("%Y-%m-%d %H:%M") }}</span>
-    </div>
-    {% else %}
-    <div class="comment {% if c.is_reply %}is-reply{% endif %}">
-      <div class="comment-meta">
-        {{ avatar(c.author, 24) }}
-        <span class="author">{{ c.author }}</span>
-        · {{ c.target_label }}
-        · {{ c.ts.strftime("%Y-%m-%d %H:%M") }}
-      </div>
-      <div class="comment-body">{{ c.body_html|safe }}</div>
-    </div>
-    {% endif %}
-  {% endfor %}
-</section>
-{% endif %}
-
 {% endblock %}

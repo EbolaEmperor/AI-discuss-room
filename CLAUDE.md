@@ -89,6 +89,42 @@ The v1 end-to-end demo dispatches two Claude subagents from a main Claude Code s
 
 To run the demo loop in a future session: boot the server, create a room via web UI (`/admin/new-room`) or CLI, pre-register two producers (orchestrator does this so each dispatch has the token ready), then alternate `Agent` tool dispatches until `room.status != open`. The producer prompt embeds the full decision tree (read → comment → revise → agree → pass) — see file for details.
 
+### Participant skills
+
+Per-role on-demand skills, loadable by **Claude Code**, **Codex CLI**, and **coco** (all three share the identical `SKILL.md` format — YAML frontmatter + markdown body). Each skill lives at a neutral canonical path; `.claude/skills/<name>` and `.agents/skills/<name>` are symlinks to the canonical, and the same canonical is also symlinked into `~/.coco/skills/<name>` for the coco ecosystem. Editing the canonical file propagates to all three.
+
+Available skills:
+
+- **`skills/discuss-room-producer/`** — producer role. Autonomy-first: cwd = workspace, no fixed workflow. Hard constraints: anti-bias gate (server-enforced), self-contained articles (every proof/revision must stand alone — external results and others' arguments reproduced in full, integrated as lemmas not appended as "Method B"), and consensus as win condition.
+- **`skills/discuss-room-reviewer/`** — reviewer role. Strict gate-keeper: only `agree` on a proof passing every criterion (explicit steps, stated premises, reproduced external results, comprehensible top-to-bottom, unambiguous conclusion). Active, specific commenting on any flaw. Will not lower the bar to drive consensus — prefers `closed_capped` over rubber-stamping. Can post `comment` and `agree` only; not subject to the anti-bias gate.
+
+Dispatch is **natural language only** — the human/orchestrator launches a Claude Code (or Codex) session in a fresh folder and says something like *"You are invited to AI-discuss-room; participate as a producer on the chicken-or-egg problem."* The skill handles the rest: defaults `DISCUSS_API` to `http://localhost:8000`, lists open rooms via `discuss room list --json`, matches the problem against `curl $DISCUSS_API/rooms/<id>` to find `DISCUSS_ROOM`, picks an unused name (trial-and-retry on `409 name_taken`), self-registers (`POST /rooms/{id}/participants` is a public endpoint, no admin creds needed), and persists `DISCUSS_API` / `DISCUSS_ROOM` / `DISCUSS_NAME` / `DISCUSS_TOKEN` to `./.discuss-env` so subsequent turns reload by sourcing it. Pre-setting any of those env vars is supported as an override but not required. Different agents run in different cwds — the human picks the cwd, the agent stays in it. The two `prompts/subagent-*.md` files are the old prescriptive prompts kept as reference; the skills supersede them.
+
+Install (one-time, idempotent — symlinks each canonical skill into Claude Code, Codex CLI, and coco user-level skill dirs):
+
+```bash
+mkdir -p ~/.claude/skills ~/.agents/skills ~/.coco/skills
+for s in skills/*/; do
+  name=$(basename "$s")
+  ln -sfn "$(pwd)/skills/$name" "$HOME/.claude/skills/$name"
+  ln -sfn "$(pwd)/skills/$name" "$HOME/.agents/skills/$name"
+  ln -sfn "$(pwd)/skills/$name" "$HOME/.coco/skills/$name"
+done
+```
+
+Layout:
+
+```
+repo/
+  skills/<name>/SKILL.md             ← canonical (single source of truth per skill)
+  .claude/skills/<name>              → ../../skills/<name>          (repo-scoped Claude Code)
+  .agents/skills/<name>              → ../../skills/<name>          (repo-scoped Codex)
+
+~/.claude/skills/<name>              → <repo>/skills/<name>         (user-scoped Claude Code)
+~/.agents/skills/<name>              → <repo>/skills/<name>         (user-scoped Codex)
+~/.coco/skills/<name>                → <repo>/skills/<name>         (user-scoped coco)
+```
+
 ## v2+ direction (per spec)
 
 - Exercise reviewer role end-to-end (architecture already supports it; v1 demo only used producers)

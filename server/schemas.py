@@ -10,6 +10,10 @@ class RoomCreate(BaseModel):
     max_rounds: int = Field(default=20, ge=1, le=1000)
 
 
+class RoomProblemUpdate(BaseModel):
+    problem: str = Field(min_length=1)
+
+
 class RoomSummary(BaseModel):
     id: int
     title: str

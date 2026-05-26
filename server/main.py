@@ -26,8 +26,20 @@ app.add_middleware(
 )
 
 _HERE = Path(__file__).parent
-app.mount("/static", StaticFiles(directory=_HERE / "static"), name="static")
+_STATIC_DIR = _HERE / "static"
+app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
 templates = Jinja2Templates(directory=_HERE / "templates")
+
+
+def _static_v(name: str) -> str:
+    """Cache-busting query value for a /static asset, based on file mtime."""
+    try:
+        return str(int((_STATIC_DIR / name).stat().st_mtime))
+    except OSError:
+        return "0"
+
+
+templates.env.globals["static_v"] = _static_v
 
 
 @app.exception_handler(HTTPException)
