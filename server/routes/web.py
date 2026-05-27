@@ -5,8 +5,15 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from server.db import get_db
-from server.models import Room, Participant, Post
-from server.auth import err, current_admin_or_none, authenticate_admin, verify_password, hash_password
+from server.models import Room, Participant, Post, AdminUser
+from server.auth import (
+    err,
+    current_admin_or_none,
+    authenticate_admin,
+    verify_password,
+    hash_password,
+    require_admin_session,
+)
 from server.avatars import avatar_url
 
 router = APIRouter(tags=["web"])
@@ -28,13 +35,23 @@ def _ctx(request: Request, db: Session, extra: dict | None = None) -> dict:
 
 
 @router.get("/", response_class=HTMLResponse)
-def index(request: Request, db: Session = Depends(get_db)):
+def index(
+    request: Request,
+    db: Session = Depends(get_db),
+    _: AdminUser = Depends(require_admin_session),
+):
     rooms = db.query(Room).order_by(Room.id.desc()).all()
     out = []
     for r in rooms:
-        pc = db.query(func.count(Participant.id)).filter(Participant.room_id == r.id).scalar()
+        # Counts + avatar names reflect ACTIVE participants only — unregistered
+        # ones should not appear on the index. (Matches the room-view rule.)
+        pc = (db.query(func.count(Participant.id))
+              .filter(Participant.room_id == r.id,
+                      Participant.unregistered_at.is_(None)).scalar())
         postc = db.query(func.count(Post.id)).filter(Post.room_id == r.id).scalar()
-        names = [n for (n,) in db.query(Participant.name).filter(Participant.room_id == r.id).all()]
+        names = [n for (n,) in db.query(Participant.name)
+                 .filter(Participant.room_id == r.id,
+                         Participant.unregistered_at.is_(None)).all()]
         out.append({"id": r.id, "title": r.title, "status": r.status,
                     "participant_count": pc, "post_count": postc,
                     "participants": names})
@@ -49,7 +66,12 @@ def _room_or_404(db: Session, room_id: int) -> Room:
 
 
 @router.get("/room/{room_id}", response_class=HTMLResponse)
-def room_view(request: Request, room_id: int, db: Session = Depends(get_db)):
+def room_view(
+    request: Request,
+    room_id: int,
+    db: Session = Depends(get_db),
+    _: AdminUser = Depends(require_admin_session),
+):
     room = _room_or_404(db, room_id)
     participants = db.query(Participant).filter(Participant.room_id == room_id).all()
     current = (db.query(Post)
@@ -120,7 +142,12 @@ def room_view(request: Request, room_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/room/{room_id}/timeline-partial", response_class=HTMLResponse)
-def timeline_partial(request: Request, room_id: int, db: Session = Depends(get_db)):
+def timeline_partial(
+    request: Request,
+    room_id: int,
+    db: Session = Depends(get_db),
+    _: AdminUser = Depends(require_admin_session),
+):
     _room_or_404(db, room_id)
     posts = db.query(Post).filter(Post.room_id == room_id).order_by(Post.id.asc()).all()
     items = []
@@ -138,8 +165,7 @@ def timeline_partial(request: Request, room_id: int, db: Session = Depends(get_d
 from fastapi import Form, status as http_status
 from fastapi.responses import RedirectResponse
 from datetime import datetime
-from server.auth import require_admin, require_admin_session
-from server.models import AdminUser
+from server.auth import require_admin
 
 
 @router.get("/admin/new-room", response_class=HTMLResponse)
@@ -230,6 +256,24 @@ def admin_remove_participant(
     return RedirectResponse(url=f"/room/{room_id}", status_code=303)
 
 
+@router.post("/admin/room/{room_id}/close")
+def admin_close_room(
+    room_id: int,
+    db: Session = Depends(get_db),
+    _: AdminUser = Depends(require_admin_session),
+):
+    """Manual close from the room page's admin button. Same semantics as the
+    Basic-auth `POST /rooms/{id}/close` used by the CLI: only valid when the
+    room is `open` or `closed_capped`. Terminal states are rejected."""
+    room = _room_or_404(db, room_id)
+    if room.status not in ("open", "closed_capped"):
+        err("room_closed", f"room already in terminal state {room.status}", http=409)
+    room.status = "closed_manual"
+    room.closed_at = datetime.utcnow()
+    db.commit()
+    return RedirectResponse(url=f"/room/{room_id}", status_code=303)
+
+
 @router.post("/admin/render-markdown", response_class=HTMLResponse)
 def render_markdown_fragment(
     problem: str = Form(""),
@@ -240,7 +284,13 @@ def render_markdown_fragment(
 
 
 @router.get("/room/{room_id}/post/{post_id}", response_class=HTMLResponse)
-def post_detail(request: Request, room_id: int, post_id: int, db: Session = Depends(get_db)):
+def post_detail(
+    request: Request,
+    room_id: int,
+    post_id: int,
+    db: Session = Depends(get_db),
+    _: AdminUser = Depends(require_admin_session),
+):
     from server.lineage import lineage_of, comments_for_lineage
     from server.markdown_render import render
     room = _room_or_404(db, room_id)
@@ -323,7 +373,12 @@ def post_detail(request: Request, room_id: int, post_id: int, db: Session = Depe
 
 
 @router.get("/room/{room_id}/audit", response_class=HTMLResponse)
-def room_audit(request: Request, room_id: int, db: Session = Depends(get_db)):
+def room_audit(
+    request: Request,
+    room_id: int,
+    db: Session = Depends(get_db),
+    _: AdminUser = Depends(require_admin_session),
+):
     room = _room_or_404(db, room_id)
     from server.models import Read
     posts = db.query(Post).filter(Post.room_id == room_id).all()
@@ -388,17 +443,12 @@ def admin_logout(request: Request):
     return RedirectResponse(url="/", status_code=303)
 
 
-@router.get("/admin/settings", response_class=HTMLResponse)
-def admin_settings_get(
-    request: Request,
-    db: Session = Depends(get_db),
-    ok: int = 0,
-    me: AdminUser = Depends(require_admin_session),
-):
-    return _templates().TemplateResponse(
-        request, "admin_settings.html",
-        _ctx(request, db, {"ok": ok == 1, "error": None}),
-    )
+@router.get("/admin/settings")
+def admin_settings_get(_: AdminUser = Depends(require_admin_session)):
+    """Settings now live in a modal on every admin-visible page. Redirect
+    legacy /admin/settings URLs to the home page with a flag that auto-opens
+    the modal."""
+    return RedirectResponse(url="/?settings=open", status_code=303)
 
 
 @router.post("/admin/settings/password")
@@ -417,13 +467,30 @@ def admin_settings_change_password(
         error = "New password and confirmation do not match."
     elif len(new_password) < 8:
         error = "New password must be at least 8 characters."
+
+    is_htmx = request.headers.get("HX-Request") == "true"
+
     if error:
-        return _templates().TemplateResponse(
-            request, "admin_settings.html",
-            _ctx(request, db, {"ok": False, "error": error}),
-            status_code=400,
-        )
+        if is_htmx:
+            return _templates().TemplateResponse(
+                request, "partials/_settings_status.html",
+                _ctx(request, db, {"error": error}),
+                status_code=400,
+            )
+        # Non-HTMX fallback (JS disabled, etc.) — bounce home; the user can
+        # re-open the modal and retry.
+        return RedirectResponse(url="/?settings=open", status_code=303)
+
     me.password_hash = hash_password(new_password)
     me.updated_at = datetime.utcnow()
     db.commit()
-    return RedirectResponse(url="/admin/settings?ok=1", status_code=303)
+
+    if is_htmx:
+        resp = _templates().TemplateResponse(
+            request, "partials/_settings_status.html",
+            _ctx(request, db, {"error": None}),
+        )
+        # Signal the client-side modal script to reset the form + auto-close.
+        resp.headers["HX-Trigger"] = "passwordChanged"
+        return resp
+    return RedirectResponse(url="/", status_code=303)

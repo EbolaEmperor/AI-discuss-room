@@ -81,10 +81,10 @@ def test_edit_problem_404_on_bad_room(client, db_session):
 
 def test_room_page_shows_edit_button_only_for_admin(client, db_session):
     room = _make_room(db_session)
-    # Anonymous: no Edit button
-    r = client.get(f"/room/{room.id}")
-    assert r.status_code == 200
-    assert f"/admin/room/{room.id}/edit-problem" not in r.text
+    # Anonymous: the room page itself is now admin-only — redirect to login.
+    r = client.get(f"/room/{room.id}", follow_redirects=False, headers={"Accept": "text/html"})
+    assert r.status_code == 303
+    assert "/admin/login" in r.headers["location"]
     # Admin: Edit button visible
     _login(client)
     r = client.get(f"/room/{room.id}")
@@ -113,3 +113,80 @@ def test_room_page_edit_button_no_confirm_when_empty(client, db_session):
     assert r.status_code == 200
     # No participants, no posts → no confirm wrapper around the edit button
     assert "onclick=\"return confirm(" not in r.text
+
+
+# ─── Admin "Close room" button (POST /admin/room/{id}/close) ─────────────
+
+def test_close_room_requires_login(client, db_session):
+    room = _make_room(db_session)
+    r = client.post(f"/admin/room/{room.id}/close", follow_redirects=False,
+                    headers={"Accept": "text/html"})
+    assert r.status_code == 303
+    assert "/admin/login" in r.headers["location"]
+
+
+def test_close_room_sets_status_closed_manual(client, db_session):
+    room = _make_room(db_session)
+    assert room.status == "open"
+    _login(client)
+    r = client.post(f"/admin/room/{room.id}/close", follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["location"] == f"/room/{room.id}"
+    db_session.refresh(room)
+    assert room.status == "closed_manual"
+    assert room.closed_at is not None
+
+
+def test_close_room_works_from_closed_capped(client, db_session):
+    """closed_capped is a non-terminal closure (round-cap safety net) — admin
+    can still convert it to closed_manual to reflect that the decision is
+    final, not a cap-overflow accident."""
+    room = _make_room(db_session, status="closed_capped")
+    _login(client)
+    r = client.post(f"/admin/room/{room.id}/close", follow_redirects=False)
+    assert r.status_code == 303
+    db_session.refresh(room)
+    assert room.status == "closed_manual"
+
+
+def test_close_room_rejects_already_consensus(client, db_session):
+    room = _make_room(db_session, status="closed_consensus")
+    _login(client)
+    r = client.post(f"/admin/room/{room.id}/close", follow_redirects=False)
+    assert r.status_code == 409
+    db_session.refresh(room)
+    assert room.status == "closed_consensus"  # unchanged
+
+
+def test_close_room_rejects_already_manual(client, db_session):
+    room = _make_room(db_session, status="closed_manual")
+    _login(client)
+    r = client.post(f"/admin/room/{room.id}/close", follow_redirects=False)
+    assert r.status_code == 409
+
+
+def test_close_room_404(client, db_session):
+    _login(client)
+    r = client.post("/admin/room/99999/close", follow_redirects=False)
+    assert r.status_code == 404
+
+
+def test_room_page_shows_close_button_only_for_admin_when_open(client, db_session):
+    room = _make_room(db_session)
+    # Anonymous → redirect to login, no button.
+    r = client.get(f"/room/{room.id}", follow_redirects=False, headers={"Accept": "text/html"})
+    assert r.status_code == 303
+    # Admin → button visible.
+    _login(client)
+    r = client.get(f"/room/{room.id}")
+    assert r.status_code == 200
+    assert f'action="/admin/room/{room.id}/close"' in r.text
+    assert "Close room" in r.text
+
+
+def test_room_page_hides_close_button_when_already_terminal(client, db_session):
+    room = _make_room(db_session, status="closed_consensus")
+    _login(client)
+    r = client.get(f"/room/{room.id}")
+    assert r.status_code == 200
+    assert f'action="/admin/room/{room.id}/close"' not in r.text

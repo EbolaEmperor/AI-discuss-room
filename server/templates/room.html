@@ -25,7 +25,22 @@
     {{ post_count }} post{{ '' if post_count == 1 else 's' }}
     <span class="rm-meta-sep">·</span>
     <a href="/room/{{ room.id }}/audit" class="rm-meta-link">View audit →</a>
+    {% if current_admin and room.status in ('open', 'closed_capped') %}
+    <span class="rm-meta-sep">·</span>
+    <button type="submit"
+            form="close-room-form-{{ room.id }}"
+            class="rm-meta-link rm-meta-link-danger rm-meta-btn">Close room →</button>
+    {% endif %}
   </p>
+
+  {# Out-of-flow form referenced by the Close button via the HTML `form`
+     attribute, so the button can sit inline in the meta paragraph above. #}
+  {% if current_admin and room.status in ('open', 'closed_capped') %}
+  <form id="close-room-form-{{ room.id }}"
+        method="post" action="/admin/room/{{ room.id }}/close"
+        hidden
+        onsubmit="return confirm('Close this room manually?\n\nStatus will be set to closed_manual. No further posts, agrees, or revisions will be possible.\n\nThis cannot be undone. Proceed?');"></form>
+  {% endif %}
 </header>
 
 <div class="rm-split">

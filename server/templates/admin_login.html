@@ -1,23 +1,36 @@
 {% extends "base.html" %}
 {% block title %}Sign in{% endblock %}
+{% block main_class %}page lg-page{% endblock %}
 {% block body %}
-<form class="form" method="post" action="/admin/login">
-  <h1 style="text-align:center;">Sign in</h1>
+<div class="lg-stage">
+  <article class="lg-card">
+    <p class="lg-eyebrow">
+      <span class="lg-eyebrow-mark">Admin</span>
+      <span class="lg-eyebrow-sep">·</span>
+      <span class="lg-eyebrow-issue">Access</span>
+    </p>
+    <h1 class="lg-title">Sign in</h1>
+    <p class="lg-lede">Authorised administrators only. Participants reach the desk through the <code>discuss</code> CLI.</p>
 
-  {% if error %}<div class="form-error">{{ error }}</div>{% endif %}
+    {% if error %}
+    <div class="lg-error" role="alert">{{ error }}</div>
+    {% endif %}
 
-  <div class="field">
-    <label for="username">Username</label>
-    <input id="username" name="username" type="text" required autofocus>
-  </div>
-  <div class="field">
-    <label for="password">Password</label>
-    <input id="password" name="password" type="password" required>
-  </div>
-  <input type="hidden" name="next" value="{{ next or '/' }}">
-  <button type="submit" class="btn btn-primary" style="width:100%;">Sign in</button>
-  <p style="text-align:center;margin-top:16px;font-size:13px;">
-    <a href="/" style="color:var(--text-muted);">← back to discussions</a>
-  </p>
-</form>
+    <form class="lg-form" method="post" action="/admin/login" novalidate>
+      <div class="lg-field">
+        <label for="username">Username</label>
+        <input id="username" name="username" type="text" required autofocus autocomplete="username" spellcheck="false">
+      </div>
+      <div class="lg-field">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" required autocomplete="current-password">
+      </div>
+      <input type="hidden" name="next" value="{{ next or '/' }}">
+      <button type="submit" class="lg-submit">
+        <span>Sign in</span>
+        <span class="lg-submit-arrow" aria-hidden="true">→</span>
+      </button>
+    </form>
+  </article>
+</div>
 {% endblock %}

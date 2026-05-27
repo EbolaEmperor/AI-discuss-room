@@ -80,7 +80,15 @@ input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); ou
   padding: 12px 0;
   margin-bottom: 24px;
 }
-.nav-inner { display: flex; align-items: center; justify-content: space-between; }
+.nav-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* Override the global .container 1100px cap: nav stretches to 90% of viewport. */
+  max-width: 90%;
+  width: 90%;
+  padding: 0;
+}
 .nav-brand { font-weight: 700; font-size: 16px; color: var(--text); }
 .nav-brand:hover { text-decoration: none; }
 .nav-links a { margin-left: 16px; color: var(--text-muted); font-size: 14px; }
@@ -687,6 +695,111 @@ input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); ou
   .ep-editor-canvas::before { transition: none !important; }
 }
 
+/* ─── New-problem page (np-) ─────────────────────────────────────────────
+ * Extends the edit-problem layout (.ep-page, .ep-header, .ep-workspace, the
+ * Manuscript/Typeset panes) so the create flow feels like the same desk.
+ * Adds: an editable serif-styled title input, a meta line for max_rounds,
+ * and a placeholder-empty state for the preview pane.
+ * ───────────────────────────────────────────────────────────────────── */
+.np-title-row {
+  margin: 0;
+  display: block;
+}
+.np-title-input {
+  width: 100%;
+  display: block;
+  border: none;
+  background: transparent;
+  padding: 0 0 2px;
+  margin: 0;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  /* Same type system as .ep-title so the room title here reads the same
+     as on the edit page. */
+  font-family: 'Newsreader', Georgia, serif;
+  font-weight: 400;
+  font-size: 30px;
+  line-height: 1.15;
+  letter-spacing: -0.005em;
+  color: var(--text);
+  transition: border-color 0.18s ease;
+}
+.np-title-input::placeholder {
+  color: var(--text-muted);
+  font-style: italic;
+  font-weight: 350;
+  opacity: 0.65;
+}
+.np-title-input:focus {
+  outline: none;
+  border-bottom-color: var(--border);
+}
+
+.np-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-top: 14px;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.np-meta-label {
+  font-weight: 600;
+}
+.np-meta-input {
+  width: 64px;
+  border: none;
+  background: transparent;
+  border-bottom: 1px solid var(--border);
+  padding: 2px 0;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text);
+  text-align: right;
+  border-radius: 0;
+  -moz-appearance: textfield;
+}
+.np-meta-input::-webkit-outer-spin-button,
+.np-meta-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.np-meta-input:focus {
+  outline: none;
+  border-bottom-color: var(--accent);
+}
+.np-meta-hint {
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  opacity: 0.75;
+}
+
+.np-preview-empty {
+  margin: 0;
+  font-family: 'Newsreader', Georgia, serif;
+  font-style: italic;
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+/* Disable the Create button when the form is fundamentally empty? Browser
+   `required` covers the submit attempt; we just style submission state via
+   the existing ep-save rules. Nothing extra needed here. */
+
+@media (max-width: 960px) {
+  .np-title-input { font-size: 24px; }
+}
+
+
 /* ─── Room view (editorial dossier) ──────────────────────────────────── *
  * The room is a folio: masthead on top, the problem (typeset sheet) on
  * the left, the dossier (participants + current proofs) on the right.
@@ -808,6 +921,26 @@ body:has(main.rm-page) {
   transition: color 0.14s ease, border-color 0.14s ease;
 }
 .rm-meta-link:hover { color: var(--text); border-bottom-color: var(--text); text-decoration: none; }
+
+/* Close-room submit button — sits inline in the .rm-meta paragraph using the
+   HTML `form="…"` attribute to point at an out-of-flow <form> tag. Resets the
+   user-agent button chrome so the button reads as a meta-link. */
+.rm-meta-btn {
+  background: none;
+  border: none;
+  padding: 0 0 1px;
+  margin: 0;
+  font: inherit;
+  color: var(--text-muted);
+  cursor: pointer;
+  vertical-align: baseline;
+  /* Inherits the underline-on-hover treatment from .rm-meta-link above. */
+}
+.rm-meta-link-danger:hover,
+.rm-meta-btn.rm-meta-link-danger:hover {
+  color: var(--danger);
+  border-bottom-color: var(--danger);
+}
 
 /* ── Consensus banner (full-width strip between masthead and split) ─── */
 .rm-consensus {
@@ -1712,4 +1845,496 @@ body:has(main.pd-page) {
   .pd-split .pd-body, .pd-rail { overflow: visible; min-height: 0; padding-left: 22px; padding-right: 22px; }
   .pd-rail { border-left: none; border-top: 1px solid var(--border); background: none; }
   .pd-solo-inner { padding: 28px 22px 56px; }
+}
+
+/* ─── Nav buttons (Settings, Logout — match the link styling visually) ── */
+.nav-btn {
+  background: none;
+  border: none;
+  margin-left: 16px;
+  padding: 0;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-bottom: 1px solid transparent;
+  line-height: 1.4;
+  transition: color 0.14s ease, border-color 0.14s ease;
+}
+.nav-btn:hover {
+  color: var(--text);
+  border-bottom-color: var(--text);
+}
+.nav-form { display: inline; margin: 0 0 0 16px; padding: 0; }
+.nav-form .nav-btn { margin-left: 0; }
+
+/* ─── Index (room list) ────────────────────────────────────────────────── */
+.ix-page {
+  max-width: none;
+  padding: 0;
+  background:
+    radial-gradient(circle at 1px 1px, rgba(60, 55, 40, 0.045) 1px, transparent 1.4px) 0 0 / 22px 22px,
+    var(--bg);
+}
+.ix-section {
+  width: 90%;
+  margin: 0 auto;
+  padding: 22px 0 40px;
+}
+.ix-section-first { padding-top: 40px; }
+.ix-section-archive { padding-top: 36px; }
+.ix-section-head { margin-bottom: 4px; }
+.ix-section-action {
+  margin-left: auto;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  padding-bottom: 1px;
+  transition: color 0.14s ease, border-color 0.14s ease;
+}
+.ix-section-action:hover {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  text-decoration: none;
+}
+
+/* Card grid — indexed journal pages. Each card is a self-contained "page" in
+   the desk's editorial vocabulary: prominent mono index marker, serif title,
+   hairline section rules above and below the title, footer with avatar stack
+   and tabular meta. Cards do not introduce a new surface color — they carry
+   the same warm bg as the desk so the dot grid reads through; a hairline
+   frame distinguishes them. Hover slides a 3px accent rule in from the left
+   edge (the card becomes a "selected" index entry, not a generic lifted box). */
+.ix-grid {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: grid;
+  /* Always exactly 4 columns. Each card occupies 1/4 of the section width
+     (minus gaps) — no fixed minimum, so the card width scales with whatever
+     the section is sized to. minmax(0, 1fr) instead of bare 1fr so the
+     cells don't blow out their grid track when the title is long. */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+.ix-card { position: relative; }
+.ix-card-link {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 200px;
+  padding: 22px 24px 20px;
+  /* Sits on the desk — same warm cream as the page bg with the same dot
+     pattern bleeding through, framed by a hairline border. The faint
+     warm tint distinguishes active cards from the desk by a single notch. */
+  background:
+    radial-gradient(circle at 1px 1px, rgba(60, 55, 40, 0.045) 1px, transparent 1.4px) 0 0 / 22px 22px,
+    color-mix(in srgb, var(--surface) 92%, var(--bg));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: inherit;
+  text-decoration: none;
+  overflow: hidden;
+  transition: border-color 0.18s ease, background-color 0.18s ease;
+}
+/* Left-edge "selected" rule — 3px accent that slides in on hover. */
+.ix-card-link::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--accent);
+  transform: scaleY(0);
+  transform-origin: top center;
+  transition: transform 0.22s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.ix-card-link:hover {
+  border-color: color-mix(in srgb, var(--text) 22%, var(--border));
+  text-decoration: none;
+}
+.ix-card-link:hover::before { transform: scaleY(1); }
+.ix-card-link:hover .ix-card-title { color: var(--accent); }
+.ix-card-link:hover .ix-card-num { color: var(--accent); }
+.ix-card-link:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+}
+.ix-card-link:focus-visible::before { transform: scaleY(1); }
+
+/* HEAD — mono index marker on the left, status word on the right, hairline
+   rule below acting as a section break. */
+.ix-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 14px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--border);
+}
+.ix-card-num {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  transition: color 0.18s ease;
+}
+.ix-card-head .rm-statusword {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+}
+
+/* TITLE — serif, sized for a 4-column grid. Override the global h2 rule
+   (`text-transform: uppercase`) so titles preserve their original casing. */
+.ix-card-title {
+  margin: 0;
+  font-family: 'Newsreader', Georgia, serif;
+  font-weight: 500;
+  font-size: 20px;
+  line-height: 1.22;
+  letter-spacing: -0.005em;
+  color: var(--text);
+  text-transform: none;
+  transition: color 0.18s ease;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* FOOT — pushed to card bottom; avatar stack on the left, tabular meta on the
+   right; another hairline above to mirror the head's rule. */
+.ix-card-foot {
+  margin-top: auto;
+  padding-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--border);
+}
+.ix-card-people {
+  display: inline-flex;
+  min-height: 22px;
+}
+.ix-card-people .avatar {
+  /* Ring matches the card surface, not the page, so the stack reads as
+     contained within the card. */
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--surface) 92%, var(--bg));
+}
+.ix-card-stats {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  line-height: 1.4;
+}
+.ix-card-sep { opacity: 0.5; margin: 0 4px; }
+
+/* Archive cards intentionally share the active styling — the status word
+   inside each card head (open / closed-consensus / closed-manual /
+   closed-capped) is the sole visual distinction. */
+
+.ix-empty {
+  margin: 8px 0 0;
+  padding: 26px 4px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  font-family: 'Newsreader', Georgia, serif;
+  font-style: italic;
+  font-size: 16px;
+  color: var(--text-muted);
+}
+.ix-empty-link {
+  font-family: 'Inter', sans-serif;
+  font-style: normal;
+  font-size: 13px;
+  margin-left: 8px;
+  border-bottom: 1px solid transparent;
+  padding-bottom: 1px;
+  transition: border-color 0.14s ease;
+}
+.ix-empty-link:hover { border-bottom-color: var(--accent); text-decoration: none; }
+
+/* Staggered reveal on first paint */
+.ix-page .ix-section {
+  animation: ix-rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.ix-page .ix-section             { animation-delay: 0ms;   }
+.ix-page .ix-section + .ix-section { animation-delay: 80ms; }
+@keyframes ix-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@media (max-width: 720px) {
+  .ix-section { padding: 20px 0 32px; }
+  .ix-section-first { padding-top: 28px; }
+  .ix-grid { grid-template-columns: 1fr; gap: 14px; }
+  .ix-card-link { min-height: 0; padding: 18px 18px 16px; }
+  .ix-card-title { font-size: 20px; }
+}
+
+/* ─── Login (also used by settings modal for shared eyebrow/title/form) ── */
+.lg-page {
+  max-width: none;
+  padding: 0;
+  background:
+    radial-gradient(circle at 1px 1px, rgba(60, 55, 40, 0.045) 1px, transparent 1.4px) 0 0 / 22px 22px,
+    var(--bg);
+  display: flex;
+  flex-direction: column;
+}
+.lg-stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px 80px;
+}
+.lg-card {
+  width: 100%;
+  max-width: 420px;
+  padding: 36px 4px;
+  animation: ix-rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.lg-eyebrow {
+  margin: 0 0 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.lg-eyebrow-mark { color: var(--text); }
+.lg-eyebrow-sep { opacity: 0.55; font-weight: 400; }
+.lg-eyebrow-issue {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 12px;
+  letter-spacing: 0;
+  color: var(--text-muted);
+  text-transform: none;
+}
+
+.lg-title {
+  margin: 0 0 14px;
+  font-family: 'Newsreader', Georgia, serif;
+  font-weight: 400;
+  font-size: 44px;
+  line-height: 1.08;
+  letter-spacing: -0.014em;
+  color: var(--text);
+  /* override the global h2 rule that forces uppercase + caps tracking */
+  text-transform: none;
+}
+.lg-lede {
+  margin: 0 0 28px;
+  font-family: 'Newsreader', Georgia, serif;
+  font-style: italic;
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+.lg-lede code {
+  font-family: 'JetBrains Mono', monospace;
+  font-style: normal;
+  font-size: 0.88em;
+  background: rgba(60, 55, 40, 0.07);
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: var(--text);
+}
+
+.lg-form { margin: 0; }
+.lg-field { margin-bottom: 22px; }
+.lg-field label {
+  display: block;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.lg-field-hint {
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  text-transform: none;
+  opacity: 0.7;
+  margin-left: 6px;
+}
+.lg-field input {
+  width: 100%;
+  display: block;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  padding: 8px 0;
+  font-family: 'Inter', sans-serif;
+  font-size: 17px;
+  color: var(--text);
+  border-radius: 0;
+  transition: border-color 0.14s ease;
+}
+.lg-field input:focus {
+  outline: none;
+  border-bottom-color: var(--accent);
+}
+.lg-field input::placeholder { color: var(--text-muted); }
+
+.lg-error {
+  margin: 0 0 22px;
+  padding: 12px 14px;
+  border-left: 3px solid var(--danger);
+  background: var(--danger-bg);
+  color: var(--text);
+  font-size: 14px;
+  font-family: 'Inter', sans-serif;
+}
+
+.lg-submit {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 12px 22px;
+  border: 1px solid var(--text);
+  background: var(--text);
+  color: var(--bg);
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease, transform 0.14s ease;
+}
+.lg-submit:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+.lg-submit:active { transform: translateY(1px); }
+.lg-submit-arrow {
+  display: inline-block;
+  transition: transform 0.14s ease;
+  font-weight: 400;
+}
+.lg-submit:hover .lg-submit-arrow { transform: translateX(3px); }
+
+/* ─── Settings modal ──────────────────────────────────────────────────── */
+.set-modal {
+  border: none;
+  padding: 0;
+  background: transparent;
+  max-width: min(520px, calc(100vw - 32px));
+  width: 100%;
+  color: var(--text);
+}
+.set-modal::backdrop {
+  background: rgba(20, 18, 12, 0.45);
+  backdrop-filter: blur(2px);
+  animation: set-fade 0.16s ease both;
+}
+@keyframes set-fade { from { opacity: 0; } to { opacity: 1; } }
+.set-modal[open] {
+  animation: set-rise 0.22s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@keyframes set-rise {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to   { opacity: 1; transform: none; }
+}
+.set-modal-card {
+  position: relative;
+  background: var(--bg);
+  background:
+    radial-gradient(circle at 1px 1px, rgba(60, 55, 40, 0.045) 1px, transparent 1.4px) 0 0 / 22px 22px,
+    var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px 36px 36px;
+  box-shadow:
+    0 18px 48px -16px rgba(20, 18, 12, 0.35),
+    0 4px 12px -4px rgba(20, 18, 12, 0.18);
+}
+.set-modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.14s ease, border-color 0.14s ease, background 0.14s ease;
+}
+.set-modal-close:hover {
+  color: var(--text);
+  border-color: var(--border);
+  background: var(--surface);
+}
+.set-modal-close:focus-visible {
+  outline: none;
+  border-color: var(--text);
+  color: var(--text);
+}
+.set-modal-close:focus:not(:focus-visible) { outline: none; }
+.set-modal-head { margin-bottom: 26px; }
+.set-modal-head .lg-title { font-size: 36px; margin-bottom: 10px; }
+.set-modal-head .lg-lede { margin: 0; font-size: 15px; }
+.set-modal-section { }
+.set-section-head { margin-bottom: 22px; }
+
+.set-form { margin: 0; }
+.set-form .lg-field { margin-bottom: 18px; }
+.set-form .lg-field input { font-size: 15px; padding: 6px 0; }
+.set-submit { width: 100%; justify-content: center; margin-top: 14px; }
+
+.set-status:empty { display: none; }
+.set-status { margin-bottom: 18px; }
+.set-success {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-left: 3px solid var(--success);
+  background: var(--success-bg);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+}
+.set-success-mark {
+  font-weight: 700;
+  color: var(--success);
+  font-size: 16px;
+  line-height: 1;
+}
+
+@media (max-width: 480px) {
+  .set-modal-card { padding: 26px 22px 28px; }
+  .set-modal-head .lg-title { font-size: 30px; }
 }

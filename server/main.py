@@ -44,11 +44,14 @@ templates.env.globals["static_v"] = _static_v
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
-    # For HTML routes that fail auth, redirect to login instead of returning 401 JSON
+    # For HTML routes that fail auth, redirect to login instead of returning 401 JSON.
+    # JSON API clients (the CLI, curl with default Accept) do not advertise text/html,
+    # so they continue to receive the JSON error payload and proper 401 status.
     if exc.status_code == 401:
         accept = request.headers.get("accept", "")
-        if "text/html" in accept and "/admin/" in str(request.url.path):
-            next_url = str(request.url.path)
+        path = str(request.url.path)
+        if "text/html" in accept and path != "/admin/login":
+            next_url = path
             if request.url.query:
                 next_url += "?" + request.url.query
             return RedirectResponse(url=f"/admin/login?next={next_url}", status_code=303)

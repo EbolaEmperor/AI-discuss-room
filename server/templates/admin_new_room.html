@@ -1,22 +1,125 @@
 {% extends "base.html" %}
-{% block title %}New Room{% endblock %}
+{% block title %}New Problem{% endblock %}
+{% block main_class %}edit-fullscreen ep-page np-page{% endblock %}
 {% block body %}
-<form class="form" method="post" action="/admin/new-room" style="max-width: 720px;">
-  <h1>Create New Room</h1>
-  <p style="color: var(--text-muted); margin: 0 0 24px;">A room hosts a single problem and the AI discussion that converges on it.</p>
+<form method="post" action="/admin/new-room" class="ep-form" data-np-form>
 
-  <div class="field">
-    <label for="title">Title</label>
-    <input id="title" name="title" type="text" required maxlength="255">
+  <header class="ep-header np-header">
+    <div class="ep-header-block">
+      <p class="ep-eyebrow">New Problem</p>
+
+      <h1 class="ep-title np-title-row">
+        <input type="text"
+               id="title" name="title"
+               class="np-title-input"
+               placeholder="Untitled room"
+               required
+               maxlength="255"
+               autocomplete="off"
+               spellcheck="false"
+               data-np-title>
+      </h1>
+
+      <div class="np-meta">
+        <label for="max_rounds" class="np-meta-label">Max rounds</label>
+        <input type="number" id="max_rounds" name="max_rounds"
+               value="20" min="1" max="1000"
+               class="np-meta-input"
+               autocomplete="off">
+        <span class="np-meta-hint">per participant — safety cap if consensus stalls</span>
+      </div>
+    </div>
+
+    <div class="ep-header-actions">
+      <span class="ep-state" data-np-state aria-live="polite"></span>
+      <a href="/" class="ep-cancel">Discard</a>
+      <button type="submit" class="ep-save" data-np-submit>Create room</button>
+    </div>
+  </header>
+
+  <div class="ep-workspace">
+    <section class="ep-pane ep-pane-editor" aria-label="Manuscript">
+      <header class="ep-pane-head">
+        <span class="ep-pane-num">01</span>
+        <span class="ep-pane-name">Manuscript</span>
+        <span class="ep-pane-hint">Markdown · LaTeX with $&hellip;$</span>
+      </header>
+      <div class="ep-editor-canvas">
+        <textarea id="problem" name="problem" required
+                  hx-post="/admin/render-markdown"
+                  hx-target="#problem-preview"
+                  hx-swap="innerHTML"
+                  hx-trigger="input changed delay:300ms"
+                  spellcheck="false"
+                  placeholder="State the problem in detail. Markdown supported. LaTeX with $...$ inline or $$...$$ display."
+                  data-np-body></textarea>
+      </div>
+    </section>
+
+    <section class="ep-pane ep-pane-preview" aria-label="Typeset preview">
+      <header class="ep-pane-head">
+        <span class="ep-pane-num">02</span>
+        <span class="ep-pane-name">Typeset</span>
+        <span class="ep-pane-hint">Live preview · KaTeX</span>
+      </header>
+      <div class="ep-preview-canvas">
+        <article id="problem-preview" class="ep-preview">
+          <p class="np-preview-empty">Start typing in the manuscript pane to see the typeset preview here.</p>
+        </article>
+      </div>
+    </section>
   </div>
-  <div class="field">
-    <label for="problem">Problem (Markdown · LaTeX with $...$)</label>
-    <textarea id="problem" name="problem" required></textarea>
-  </div>
-  <div class="field" style="max-width: 200px;">
-    <label for="max_rounds">Max rounds (per participant)</label>
-    <input id="max_rounds" name="max_rounds" type="number" value="20" min="1" max="1000">
-  </div>
-  <button type="submit" class="btn btn-primary">Create</button>
 </form>
+
+<script>
+  // 1) Re-render KaTeX on every HTMX swap of the preview pane.
+  //    Same pattern as the edit-problem page so the math reflows live.
+  document.body.addEventListener('htmx:afterSwap', function (e) {
+    if (!e.detail || !e.detail.target) return;
+    if (e.detail.target.id !== 'problem-preview') return;
+    if (typeof renderMathInElement === 'function') {
+      renderMathInElement(e.detail.target, {
+        delimiters: [
+          {left: '$$', right: '$$', display: true},
+          {left: '$',  right: '$',  display: false},
+          {left: '\\[', right: '\\]', display: true},
+          {left: '\\(', right: '\\)', display: false}
+        ],
+        throwOnError: false
+      });
+    }
+    var canvas = document.querySelector('.ep-preview-canvas');
+    if (canvas) {
+      canvas.classList.remove('ep-flash');
+      void canvas.offsetWidth;
+      canvas.classList.add('ep-flash');
+    }
+  });
+
+  // 2) Draft / Creating state indicator. Mirrors the dirty-state logic on
+  //    edit-problem; here the "dirty" state is just "the user typed
+  //    anything" because there's no on-load value to compare against.
+  (function () {
+    var form  = document.querySelector('[data-np-form]');
+    var title = document.querySelector('[data-np-title]');
+    var body  = document.querySelector('[data-np-body]');
+    var state = document.querySelector('[data-np-state]');
+    if (!form || !title || !body || !state) return;
+    function refresh() {
+      if (title.value.length || body.value.length) {
+        state.textContent = 'Draft';
+        state.dataset.kind = 'dirty';
+      } else {
+        state.textContent = '';
+        delete state.dataset.kind;
+      }
+    }
+    title.addEventListener('input', refresh);
+    body.addEventListener('input', refresh);
+    form.addEventListener('submit', function () {
+      state.textContent = 'Creating…';
+      state.dataset.kind = 'saving';
+    });
+  })();
+</script>
 {% endblock %}

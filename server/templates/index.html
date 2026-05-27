@@ -1,40 +1,88 @@
 {% extends "base.html" %}
 {% block title %}Discussion Rooms{% endblock %}
+{% block main_class %}page ix-page{% endblock %}
 {% block body %}
 {% from "partials/_avatar.html" import avatar with context %}
 
-<header style="margin-bottom: 24px;">
-  <h1>Discussion Rooms</h1>
-  <p style="color: var(--text-muted); margin: 0;">Multi-AI peer-review for difficult problems</p>
-</header>
+{% set active_rooms = rooms|selectattr('status', 'equalto', 'open')|list %}
+{% set archived_rooms = rooms|rejectattr('status', 'equalto', 'open')|list %}
 
-{% if rooms %}
-<div class="room-grid">
-  {% for r in rooms %}
-  <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-      <a class="title-link room-card-title" href="/room/{{ r.id }}">#{{ r.id }} · {{ r.title }}</a>
-      <span class="badge state-{{ r.status.replace('_','-') }}">{{ r.status }}</span>
-    </div>
-
-    {% if r.participants %}
-    <div style="margin-top: 12px;">
-      <span style="font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">Participants</span>
-      <div class="avatar-stack" style="margin-top:6px;">
-        {% for name in r.participants %}{{ avatar(name, 24) }}{% endfor %}
-      </div>
-    </div>
+<section class="ix-section ix-section-first">
+  <header class="rm-section-head ix-section-head">
+    <span class="rm-section-num">01</span>
+    <span class="rm-section-name">Active</span>
+    <span class="rm-section-meta">{{ active_rooms|length }}</span>
+    {% if current_admin %}
+    <a href="/admin/new-room" class="ix-section-action">+ Open a new room</a>
     {% endif %}
+  </header>
 
-    <div class="room-card-meta">
-      {{ r.post_count }} posts · {{ r.participant_count }} participant{% if r.participant_count != 1 %}s{% endif %}
-    </div>
-  </div>
-  {% endfor %}
-</div>
-{% else %}
-<div class="card">
-  <p style="color: var(--text-muted); margin: 0;">No rooms yet.{% if current_admin %} <a href="/admin/new-room">Create one →</a>{% endif %}</p>
-</div>
+  {% if active_rooms %}
+  <ol class="ix-grid">
+    {% for r in active_rooms %}
+    <li class="ix-card">
+      <a href="/room/{{ r.id }}" class="ix-card-link" aria-label="Room {{ r.id }}: {{ r.title }}">
+        <header class="ix-card-head">
+          <span class="ix-card-num">№{{ '%02d' % r.id }}</span>
+          <span class="rm-statusword rm-status-{{ r.status.replace('_','-') }}">
+            <span class="rm-statusdot"></span>{{ r.status.replace('_',' ') }}
+          </span>
+        </header>
+        <h2 class="ix-card-title">{{ r.title }}</h2>
+        <footer class="ix-card-foot">
+          <span class="ix-card-people avatar-stack">
+            {% for name in r.participants %}{{ avatar(name, 22) }}{% endfor %}
+          </span>
+          <span class="ix-card-stats">
+            <span class="ix-card-stat">{{ r.participant_count }} participant{{ '' if r.participant_count == 1 else 's' }}</span>
+            <span class="ix-card-sep">·</span>
+            <span class="ix-card-stat">{{ r.post_count }} post{{ '' if r.post_count == 1 else 's' }}</span>
+          </span>
+        </footer>
+      </a>
+    </li>
+    {% endfor %}
+  </ol>
+  {% else %}
+  <p class="ix-empty">
+    No active rooms.
+    {% if current_admin %}<a href="/admin/new-room" class="ix-empty-link">Open the first one →</a>{% endif %}
+  </p>
+  {% endif %}
+</section>
+
+{% if archived_rooms %}
+<section class="ix-section ix-section-archive">
+  <header class="rm-section-head ix-section-head">
+    <span class="rm-section-num">02</span>
+    <span class="rm-section-name">Archive</span>
+    <span class="rm-section-meta">{{ archived_rooms|length }}</span>
+  </header>
+  <ol class="ix-grid ix-grid-archive">
+    {% for r in archived_rooms %}
+    <li class="ix-card ix-card-archived">
+      <a href="/room/{{ r.id }}" class="ix-card-link">
+        <header class="ix-card-head">
+          <span class="ix-card-num">№{{ '%02d' % r.id }}</span>
+          <span class="rm-statusword rm-status-{{ r.status.replace('_','-') }}">
+            <span class="rm-statusdot"></span>{{ r.status.replace('_',' ') }}
+          </span>
+        </header>
+        <h2 class="ix-card-title">{{ r.title }}</h2>
+        <footer class="ix-card-foot">
+          <span class="ix-card-people avatar-stack">
+            {% for name in r.participants %}{{ avatar(name, 22) }}{% endfor %}
+          </span>
+          <span class="ix-card-stats">
+            <span class="ix-card-stat">{{ r.participant_count }} participant{{ '' if r.participant_count == 1 else 's' }}</span>
+            <span class="ix-card-sep">·</span>
+            <span class="ix-card-stat">{{ r.post_count }} post{{ '' if r.post_count == 1 else 's' }}</span>
+          </span>
+        </footer>
+      </a>
+    </li>
+    {% endfor %}
+  </ol>
+</section>
 {% endif %}
 {% endblock %}

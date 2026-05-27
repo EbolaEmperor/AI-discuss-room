@@ -1,0 +1,119 @@
+{# Settings modal — included from base.html, gated on current_admin.
+   Markup is rendered once per page. HTMX swaps only the status fragment
+   inside the form, so the form is reusable across multiple submits. #}
+<dialog id="settings-modal" class="set-modal" aria-labelledby="set-modal-title">
+  <article class="set-modal-card">
+    <button type="button" class="set-modal-close" data-close-modal aria-label="Close settings">×</button>
+
+    <header class="set-modal-head">
+      <p class="lg-eyebrow">
+        <span class="lg-eyebrow-mark">Admin</span>
+        <span class="lg-eyebrow-sep">·</span>
+        <span class="lg-eyebrow-issue">{{ current_admin.username }}</span>
+      </p>
+      <h2 class="lg-title" id="set-modal-title">Settings</h2>
+      <p class="lg-lede">Change the editor's password. CLI tokens of registered participants are unaffected.</p>
+    </header>
+
+    <section class="set-modal-section">
+      <header class="rm-section-head set-section-head">
+        <span class="rm-section-num">01</span>
+        <span class="rm-section-name">Change password</span>
+      </header>
+
+      <form class="lg-form set-form"
+            hx-post="/admin/settings/password"
+            hx-target="#set-status"
+            hx-swap="innerHTML">
+        <div id="set-status" class="set-status" aria-live="polite"></div>
+
+        <div class="lg-field">
+          <label for="set-current">Current password</label>
+          <input id="set-current" name="current_password" type="password" required autocomplete="current-password">
+        </div>
+        <div class="lg-field">
+          <label for="set-new">New password <span class="lg-field-hint">(≥ 8 characters)</span></label>
+          <input id="set-new" name="new_password" type="password" required minlength="8" autocomplete="new-password">
+        </div>
+        <div class="lg-field">
+          <label for="set-confirm">Confirm new password</label>
+          <input id="set-confirm" name="confirm" type="password" required minlength="8" autocomplete="new-password">
+        </div>
+
+        <button type="submit" class="lg-submit set-submit">
+          <span>Update password</span>
+          <span class="lg-submit-arrow" aria-hidden="true">→</span>
+        </button>
+      </form>
+    </section>
+  </article>
+</dialog>
+
+<script>
+(function () {
+  var dlg = document.getElementById('settings-modal');
+  if (!dlg) return;
+
+  function open() {
+    if (!dlg.open) dlg.showModal();
+    // Focus the first password input instead of the close button (which is
+    // first in DOM order). The native <dialog> autofocuses the first
+    // focusable element otherwise.
+    var first = dlg.querySelector('#set-current');
+    if (first) first.focus();
+  }
+
+  // Triggers in the nav.
+  document.querySelectorAll('[data-settings-trigger]').forEach(function (el) {
+    el.addEventListener('click', function (e) {
+      e.preventDefault();
+      open();
+    });
+  });
+
+  // Close: explicit buttons + backdrop click.
+  dlg.addEventListener('click', function (e) {
+    if (e.target.closest('[data-close-modal]')) {
+      dlg.close();
+      return;
+    }
+    // Backdrop click — when the user clicks the dialog element itself
+    // (not the card), close. The card stops propagation via layout.
+    var rect = dlg.querySelector('.set-modal-card').getBoundingClientRect();
+    var inCard = (
+      e.clientX >= rect.left && e.clientX <= rect.right &&
+      e.clientY >= rect.top  && e.clientY <= rect.bottom
+    );
+    if (!inCard) dlg.close();
+  });
+
+  // Reset form on close so the next open starts fresh.
+  dlg.addEventListener('close', function () {
+    var form = dlg.querySelector('form');
+    var status = dlg.querySelector('#set-status');
+    if (form) form.reset();
+    if (status) status.innerHTML = '';
+  });
+
+  // Server emits HX-Trigger: passwordChanged on success — reset the form,
+  // keep the success banner visible briefly, then close.
+  document.body.addEventListener('passwordChanged', function () {
+    var form = dlg.querySelector('form');
+    if (form) form.reset();
+    setTimeout(function () { dlg.close(); }, 1500);
+  });
+
+  // Auto-open on ?settings=open (used by the legacy /admin/settings redirect).
+  try {
+    var sp = new URLSearchParams(window.location.search);
+    if (sp.get('settings') === 'open') {
+      open();
+      // Clean the URL so refresh doesn't re-open.
+      sp.delete('settings');
+      var qs = sp.toString();
+      var clean = window.location.pathname + (qs ? '?' + qs : '') + window.location.hash;
+      window.history.replaceState({}, '', clean);
+    }
+  } catch (_) { /* no URLSearchParams — fine. */ }
+})();
+</script>

@@ -1,0 +1,10 @@
+{# Status fragment swapped into #set-status after a settings POST.
+   `error` set → red banner. otherwise → success banner. #}
+{% if error %}
+<div class="lg-error" role="alert">{{ error }}</div>
+{% else %}
+<div class="set-success" role="status">
+  <span class="set-success-mark" aria-hidden="true">✓</span>
+  <span>Password changed.</span>
+</div>
+{% endif %}
