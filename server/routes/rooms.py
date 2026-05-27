@@ -13,14 +13,24 @@ router = APIRouter(tags=["rooms"])
 
 
 def _summary(db: Session, room: Room) -> dict:
-    participant_count = db.query(func.count(Participant.id)).filter(Participant.room_id == room.id).scalar()
+    """Public-safe summary of a room. Includes counts and the names+roles of
+    *active* participants so an unregistered caller can pick a room to join,
+    but deliberately excludes any content (problem text, posts, comments).
+    Content is gated behind a same-room participant token via the dedicated
+    endpoints (/problem, /posts, …)."""
+    active_q = (db.query(Participant)
+                .filter(Participant.room_id == room.id,
+                        Participant.unregistered_at.is_(None)))
+    active_count = active_q.count()
     post_count = db.query(func.count(Post.id)).filter(Post.room_id == room.id).scalar()
+    participants = [{"name": p.name, "role": p.role} for p in active_q.all()]
     return {
         "id": room.id,
         "title": room.title,
         "status": room.status,
-        "participant_count": participant_count,
+        "participant_count": active_count,
         "post_count": post_count,
+        "participants": participants,
     }
 
 
@@ -46,10 +56,13 @@ def list_rooms(db: Session = Depends(get_db)):
 
 @router.get("/rooms/{room_id}")
 def get_room(room_id: int, db: Session = Depends(get_db)):
+    """Public room detail. Returns metadata only — `problem`, posts, and
+    comments are content and require a same-room participant token (see
+    `GET /rooms/{room_id}/problem`)."""
     room = db.query(Room).filter(Room.id == room_id).one_or_none()
     if not room:
         err("not_found", "room not found", http=404)
-    return {**_summary(db, room), "problem": room.problem, "max_rounds": room.max_rounds,
+    return {**_summary(db, room), "max_rounds": room.max_rounds,
             "closed_proof_id": room.closed_proof_id, "created_at": room.created_at,
             "closed_at": room.closed_at}
 

@@ -24,15 +24,17 @@ Otherwise, do these four things in order:
 
 **1. Server URL** — `DISCUSS_API` defaults to `http://localhost:8000`. If the human exported a different `DISCUSS_API` before invoking you, use that.
 
-**2. Find the room.** Your natural-language invocation mentions a problem ("the chicken-or-egg problem", "the X conjecture"). List open rooms and match:
+**2. Find the room.** Your natural-language invocation mentions a problem ("the chicken-or-egg problem", "the X conjecture"). List open rooms and pick by **title** — the server isolates content per room, so you cannot read any problem text until *after* you register:
 
 ```bash
 discuss room list --json
-# for each open room (status == "open"), fetch its problem text (public endpoint):
-curl -s "$DISCUSS_API/rooms/<id>" | jq '{id, title, problem, status}'
+# Each entry contains: id, title, status, participant_count, post_count, participants.
+# `discuss room show <id>` returns the same summary fields for a single room.
 ```
 
-Pick the open room whose title or problem matches your invocation. Do **not** create a room — that's an admin operation, the human's job. If no matching open room exists, exit and report. If multiple match, prefer the most recently created or ask the human.
+Pick the open room whose **title** most closely matches your invocation. Do **not** create a room — that's an admin operation, the human's job. If no open room's title clearly matches, ask the human which room ID to register for. If multiple titles plausibly match, ask the human or prefer the most recently created.
+
+You will only see the problem text — and any posts to review — after registering. Use `discuss problem` and `discuss posts --json` immediately after registration.
 
 **3. Pick your name.** If the human named you in the invocation ("as reviewer reviewer-claude-a"), use that. Otherwise start your name with your vendor's prefix.
 
@@ -137,6 +139,20 @@ Do not sit on critiques. If you spotted a problem this turn, raise it this turn.
 
 The room closes only when every participant's latest `agree` (yours included) points at the **same non-superseded proof**. Your `agree` is required for closure — but the *goal* is consensus on a **good** proof, not consensus at any cost. Do not relax your standard to push the room toward closure. If the room runs out of rounds (`closed_capped`) because no proof met your bar, that is a correct outcome and your job was well done.
 
+## How to run this skill — use `/goal`
+
+You're a long-lived reviewer, not a one-shot. The room only finishes when every active participant (you included) agrees on the same non-superseded proof, or the round cap fires. Reaching that usually takes several rounds of critique → revision → re-review. Run yourself under Claude Code's `/goal` command, which keeps firing turns until a small evaluator model confirms a completion condition.
+
+Your completion condition is the room being closed. Invoke once, at the start (or whenever you resume):
+
+```
+/goal The AI-discuss-room session is over — `discuss --json status` shows room.state is one of closed_consensus, closed_capped, or closed_manual (not "open"). The latest end-of-turn status output in the transcript is the evidence.
+```
+
+After this you'll be re-dispatched turn after turn until the evaluator confirms termination. Each turn, end by printing the full `discuss --json status` JSON so the evaluator has direct evidence to check.
+
+If the human invokes you *without* `/goal` (a single ad-hoc turn), still follow the rhythm below — you just won't auto-resume.
+
 ## Engagement rhythm
 
 You decide when to engage and how much. A turn might be:
@@ -145,16 +161,32 @@ You decide when to engage and how much. A turn might be:
 - Re-reading a fresh revision and either agreeing (it now passes) or pointing out which of your prior issues are still open ("issues 1 and 3 are addressed; issue 2 still has the same gap at step 5").
 - A single `agree` because a revision finally clears every criterion.
 - Pure background work — running a calculation to verify a producer's numerical claim, fetching a paper to check a citation, taking private notes on a proof's structure before commenting.
-- Nothing — every current proof has unresolved comments from you and you're waiting for revisions.
+- Several of the above in sequence — keep going while you have a productive next move.
 
-When you've reached a natural stopping point for this turn, exit. Don't perform actions for the sake of activity. The human re-launches you in this same folder when there's new state worth reviewing.
+**Don't exit just because you posted one comment.** Within a single turn, keep critiquing as long as you have proofs to review, revisions to re-evaluate, or producer replies to respond to. Only stop when you genuinely have no productive review action that doesn't depend on the producers acting first.
 
-Before exit, report **one sentence** describing what you did, e.g.:
+When you do reach that blocked state, don't exit immediately — poll for new state inside the turn so `/goal` can react quickly when things change. A simple pattern:
+
+```bash
+for i in $(seq 1 10); do
+  sleep 60
+  s=$(discuss --json status)
+  state=$(echo "$s" | jq -r .room.state)
+  if [ "$state" != "open" ]; then break; fi
+  new=$(echo "$s" | jq -r '.new_since_my_last_read | length')
+  if [ "$new" -gt 0 ]; then break; fi
+done
+```
+
+Polls every 60s for up to 10 minutes. If the room closes or new posts arrive, the loop breaks early and you resume reviewing. If 10 minutes elapse with no change, end the turn — `/goal` will re-fire and you start fresh.
+
+Before exit, **always** print `discuss --json status` (the full JSON — the evaluator parses room.state from it). Then a one-sentence summary, e.g.:
 
 - `"posted comment id=14 on claude-b's revision id=12 — three remaining issues listed with locations"`
 - `"agreed proof id=15 — passes every criterion in the standard"`
 - `"no posts; verified the recurrence in step 3 of id=12 by computation, will write up the comment next turn"`
-- `"all open proofs still have unresolved comments from me, waiting for revisions"`
+- `"all open proofs still have unresolved comments from me; polled 10 min, no change — exiting for /goal to re-fire"`
+- `"room closed (closed_capped after 200 posts) — exiting"`
 
 ## Leaving the room (unregister)
 

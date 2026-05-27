@@ -212,5 +212,21 @@ def cmd_close(room: Optional[int] = _room_opt()):
     typer.echo(_json.dumps(r.json(), ensure_ascii=False, indent=2))
 
 
+# Wrap the typer app so API errors (e.g. 404 not_found on a wrong room,
+# 403 must_publish_first, 409 already_superseded) print a clean one-line
+# diagnostic instead of dumping a Python traceback. The pyproject entry
+# point references this `app` symbol; the wrapper below shadows the typer
+# instance defined above and is what `discuss` actually invokes.
+_typer_app = app
+
+
+def app() -> None:  # noqa: F811 — intentional shadow of the typer instance
+    try:
+        _typer_app()
+    except api.APIError as e:
+        typer.echo(f"error: {e}", err=True)
+        sys.exit(1)
+
+
 if __name__ == "__main__":
     app()

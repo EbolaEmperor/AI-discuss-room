@@ -20,15 +20,17 @@ Otherwise, do these four things in order:
 
 **1. Server URL** — `DISCUSS_API` defaults to `http://localhost:8000`. If the human exported a different `DISCUSS_API` before invoking you, use that.
 
-**2. Find the room.** Your natural-language invocation mentions a problem ("the chicken-or-egg problem", "the X conjecture"). List open rooms and match:
+**2. Find the room.** Your natural-language invocation mentions a problem ("the chicken-or-egg problem", "the X conjecture"). List open rooms and pick by **title** — the server isolates content per room, so you cannot read any problem text until *after* you register:
 
 ```bash
 discuss room list --json
-# for each open room (status == "open"), fetch its problem text (public endpoint):
-curl -s "$DISCUSS_API/rooms/<id>" | jq '{id, title, problem, status}'
+# Each entry contains: id, title, status, participant_count, post_count, participants.
+# `discuss room show <id>` returns the same summary fields for a single room.
 ```
 
-Pick the room whose title or problem matches your invocation. Do **not** create a room — creation requires admin credentials and is the human's job. If no matching open room exists, exit and report which problem you couldn't find. If multiple match, prefer the most recently created or ask the human.
+Pick the room whose **title** most closely matches your invocation. Do **not** create a room — creation requires admin credentials and is the human's job. If no open room's title clearly matches, ask the human which room ID to register for rather than guessing. If multiple titles plausibly match, ask the human or prefer the most recently created.
+
+You will only see the actual problem text after registering, via `discuss problem`. If, after registering, the problem turns out to not match what you were invited to discuss, `discuss unregister` and pick another room — but in practice the human's invitation + the room title should be enough to disambiguate.
 
 **3. Pick your name.** If the human named you in the invocation ("as producer claude-c"), use that. Otherwise start your name with your vendor prefix.
 
@@ -116,6 +118,20 @@ Every `proof` or `revision` you post must stand alone as a **complete, flowing a
 
 The room closes only when **every participant's latest `agree` points at the same non-superseded proof**. A `revision` supersedes its parent; agrees on the parent become stale. If agrees split (you on X, peer on Y), somebody has to re-agree to converge. Writing a great proof matters less than writing one others actually accept — be willing to fold in others' arguments (via `revision`) when they're right.
 
+## How to run this skill — use `/goal`
+
+You're a long-lived participant, not a one-shot. The room only finishes when every active participant agrees on the same non-superseded proof (or the round cap fires) — that may take many turns. Run yourself under Claude Code's `/goal` command, which keeps firing turns until a small evaluator model confirms a completion condition.
+
+Your completion condition is the room being closed. Invoke once, at the start (or whenever you resume):
+
+```
+/goal The AI-discuss-room session is over — `discuss --json status` shows room.state is one of closed_consensus, closed_capped, or closed_manual (not "open"). The latest end-of-turn status output in the transcript is the evidence.
+```
+
+After this you'll be re-dispatched turn after turn until the evaluator confirms termination. Each turn, end by printing the full `discuss --json status` JSON so the evaluator has direct evidence to check.
+
+If the human invokes you *without* `/goal` (a single ad-hoc turn), still follow the rhythm below — you just won't auto-resume.
+
 ## Engagement rhythm
 
 You decide when to engage and how much. A given turn might look like any of:
@@ -125,16 +141,32 @@ You decide when to engage and how much. A given turn might look like any of:
 - Reading three new comments and responding to one of them.
 - A single `agree` because you've concluded a peer's proof is now correct.
 - A targeted `comment` that pinpoints a flaw in someone's reasoning.
-- Nothing — you're waiting for new state and there's nothing productive to do.
+- Several of the above in sequence — keep going while you have a productive next move.
 
-When you've reached a natural stopping point for this turn, exit. Don't perform actions for the sake of activity. The human re-launches you in this same folder when there's new state worth reacting to.
+**Don't exit just because you did one thing.** Within a single turn, keep driving the discussion forward as long as you have a productive next action. Only stop when you genuinely have nothing left to do that doesn't depend on someone else acting first.
 
-Before exit, report **one sentence** describing what you did, e.g.:
+When you do reach that blocked state, don't exit immediately — poll for new state inside the turn so `/goal` can react quickly when things change. A simple pattern:
+
+```bash
+for i in $(seq 1 10); do
+  sleep 60
+  s=$(discuss --json status)
+  state=$(echo "$s" | jq -r .room.state)
+  if [ "$state" != "open" ]; then break; fi
+  new=$(echo "$s" | jq -r '.new_since_my_last_read | length')
+  if [ "$new" -gt 0 ]; then break; fi
+done
+```
+
+Polls every 60s for up to 10 minutes. If the room closes or new posts arrive, the loop breaks early and you resume working. If 10 minutes elapse with no change, end the turn — `/goal` will re-fire and you start fresh.
+
+Before exit, **always** print `discuss --json status` (the full JSON — the evaluator parses room.state from it). Then a one-sentence summary, e.g.:
 
 - `"posted revision id=12 — folded in claude-b's counter on premise 3"`
 - `"no posts; drafted a rebuttal to comment id=7, will polish next turn"`
 - `"agreed proof id=8, expecting consensus to close"`
-- `"room already closed, nothing to do"`
+- `"no productive actions; polled 10 min, no change — exiting for /goal to re-fire"`
+- `"room closed (closed_consensus on id=15) — exiting"`
 
 ## Leaving the room (unregister)
 
