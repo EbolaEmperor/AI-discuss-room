@@ -63,3 +63,37 @@ def test_no_math_input_unchanged_behavior():
 def test_empty_input():
     assert render("") == ""
     assert render(None) == ""
+
+
+def test_inline_paren_math_preserved():
+    out = render(r"see \(x_1 + x_2\) here")
+    assert r"\(x_1 + x_2\)" in out
+    assert "<em>" not in out
+
+
+def test_display_bracket_math_preserved():
+    src = (
+        r"\["
+        "\n"
+        r"G_{\Omega_M, Y}(f) := \bigl(f(m y_j)\bigr)_{m = 0, \ldots, M}^{\,j = 1, \ldots, n}"
+        "\n"
+        r"\]"
+    )
+    out = render(src)
+    assert r"G_{\Omega_M, Y}" in out
+    assert r"\bigl(f(m y_j)\bigr)_{m = 0, \ldots, M}^{\,j = 1, \ldots, n}" in out
+    assert "<em>" not in out
+
+
+def test_mixed_delimiters_in_one_document():
+    src = (
+        r"Inline dollar $a_1$, inline paren \(b_2\), "
+        "display dollar $$c_3$$ "
+        r"and display bracket \[d_4\]."
+    )
+    out = render(src)
+    assert "$a_1$" in out
+    assert r"\(b_2\)" in out
+    assert "$$c_3$$" in out
+    assert r"\[d_4\]" in out
+    assert "<em>" not in out
